@@ -321,4 +321,4 @@ def test_ts_command_registry_canonical_surface_and_wrapper_passthrough(
     assert registry["deps"] is cli_mod.cmd_deps
     assert registry["cycles"] is cli_mod.cmd_cycles
     assert registry["patterns"] is cli_mod.cmd_patterns
-    assert registry["react"] is cli_mod.cmd_react
+    assert registry["vue"] is cli_mod.cmd_vue
