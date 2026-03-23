@@ -6,8 +6,8 @@ CLI="$SCRIPT_DIR/../comfy-health"
 PASS=0
 FAIL=0
 
-pass() { ((PASS++)); echo "  ✓ $1"; }
-fail() { ((FAIL++)); echo "  ✗ $1: $2"; }
+pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
+fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1: $2"; }
 
 test_name() { echo ""; echo "TEST: $1"; }
 
