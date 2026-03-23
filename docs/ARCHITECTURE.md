@@ -246,6 +246,14 @@ Python regex scanners in `desloppify-fork/desloppify/languages/typescript/detect
 12. **Confidence ≥ 80 only.** False positives erode trust faster than missed issues
 13. **Behavioral tests > convention compliance.** Solid tests with `as any` beats perfect types with no tests
 
+## Testing
+
+```bash
+pytest tests/ -v                # Python tests (review_comfy dimensions/checks)
+bash tests/test_cli.sh          # CLI smoke tests (13 tests)
+./comfy-health doctor           # Self-check deps and config
+```
+
 ## Changes Log
 
 ### Completeness Gap Checks (v2)

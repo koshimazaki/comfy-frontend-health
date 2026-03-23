@@ -58,6 +58,51 @@ Three layers, each with a distinct job:
 
 **Key principles**: One strong reviewer (not a swarm). Behavioral tests over convention compliance. YAGNI on every feature.
 
+### Architecture
+
+```mermaid
+flowchart TD
+    subgraph Engine["desloppify engine"]
+        CATALOG["subjective_dimension_catalog.py\n21 dimensions + weights"]
+        DIMS_JSON["dimensions.json\nprompts, look_for, skip"]
+        OVERRIDE["dimensions.override.json\nTS-specific + persona rotation"]
+    end
+
+    subgraph LangPlugin["TypeScript / Vue 3 Plugin"]
+        REVIEW_COMFY["review_comfy.py\n21 HOLISTIC_REVIEW_DIMENSIONS\n10 REVIEW_GUIDANCE keys"]
+        PHASES_VUE["phases_vue.py\n6 detector modules"]
+        DETECTORS["detectors/vue/\ncomposition, styling,\ncomponents, layers,\nconventions, reka"]
+    end
+
+    subgraph AgentLayer["Claude Agent Layer"]
+        REVIEWER["code-reviewer agent\npersona rotation"]
+        PRE_PR["/pre-pr command"]
+        BEHAVIORAL["/behavioral-health"]
+        DESLOP["/comfy-deslop"]
+    end
+
+    subgraph Personas["Parallel Review Personas"]
+        P1["Pragmatist\nsimplicity bias"]
+        P2["Architect\nboundary bias"]
+        P3["Bug Hunter\nedge case bias"]
+        P4["Migrator\ndeprecation bias"]
+    end
+
+    CATALOG --> DIMS_JSON
+    DIMS_JSON --> OVERRIDE
+    OVERRIDE --> REVIEW_COMFY
+    REVIEW_COMFY --> PHASES_VUE
+    PHASES_VUE --> DETECTORS
+    REVIEW_COMFY --> REVIEWER
+    REVIEWER --> P1
+    REVIEWER --> P2
+    REVIEWER --> P3
+    REVIEWER --> P4
+    PRE_PR --> REVIEWER
+    DESLOP --> REVIEWER
+    BEHAVIORAL --> REVIEWER
+```
+
 ## CLI Reference
 
 ### comfy-health
@@ -192,43 +237,6 @@ Single `code-reviewer` agent with:
 | `*.spec.ts` | `playwright.md` |
 | `*.stories.ts` | `storybook.md` |
 | `*.ts` | `typescript.md` |
-
-## Testing
-
-```bash
-pytest tests/ -v                # Python tests (review_comfy dimensions/checks)
-bash tests/test_cli.sh          # CLI smoke tests (13 tests)
-./comfy-health doctor           # Self-check deps and config
-```
-
-## File Structure
-
-```
-comfy-frontend-health/
-  comfy-health                 # CLI wrapper script
-  desloppify-fork/             # Forked desloppify with Vue detectors
-    desloppify/languages/typescript/
-      detectors/vue/           # 6 detector modules
-      phases_vue.py            # Phase runner
-      review_comfy.py          # Vue review guidance
-  claude/                      # Agent/skill bundle → copied to .claude/
-    agents/code-reviewer.md
-    skills/                    # 7 skills
-    commands/                  # 6 commands
-    AGENTS.md                  # Project conventions (source of truth)
-    *.md                       # Guidance docs (6 glob-triggered + 2 reference)
-  tests/                       # Test suites
-    test_cli.sh                # CLI smoke tests (bash)
-    test_review_comfy.py       # Review heuristic tests (pytest)
-  completions/                 # Shell completions
-    comfy-health.bash
-    comfy-health.zsh
-  .github/workflows/health.yml # CI workflow
-  docs/
-    ARCHITECTURE.md            # Full reference, change log, roadmap
-  install.sh
-  README.md
-```
 
 ## Contributing
 
