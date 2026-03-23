@@ -33,7 +33,6 @@ TS_COMPLEXITY_SIGNALS = [
         threshold=8,
         compute=_compute_ts_destructure_props,
     ),
-    ComplexitySignal("useEffects", r"useEffect\s*\(", weight=3, threshold=3),
     ComplexitySignal(
         "inline types", None, weight=1, threshold=3, compute=_compute_ts_inline_types
     ),
@@ -41,15 +40,46 @@ TS_COMPLEXITY_SIGNALS = [
     ComplexitySignal(
         "nested ternaries", r"[^?]\?[^?.:\n][^:\n]*[^?]\?[^?.]", weight=3, threshold=2
     ),
-    ComplexitySignal("useRefs", r"\buseRef\s*[<(]", weight=2, threshold=6),
+    # Vue 3 signals (replaces React useEffect/useRef)
+    ComplexitySignal(
+        "watch calls", r"(?:watch|watchEffect)\s*\(", weight=3, threshold=3
+    ),
+    ComplexitySignal(
+        "composable calls", r"\buse[A-Z]\w+\s*\(", weight=1, threshold=8
+    ),
+    ComplexitySignal(
+        "lifecycle hooks",
+        r"\b(?:onMounted|onUnmounted|onBeforeMount|onBeforeUnmount|onUpdated)\s*\(",
+        weight=2,
+        threshold=4,
+    ),
+    ComplexitySignal(
+        "refs", r"\b(?:ref|shallowRef|toRef)\s*[<(]", weight=1, threshold=8
+    ),
 ]
 
 TS_GOD_RULES = [
-    GodRule("context_hooks", "context hooks", lambda c: c.metrics.get("context_hooks", 0), 3),
-    GodRule("use_effects", "useEffects", lambda c: c.metrics.get("use_effects", 0), 4),
-    GodRule("use_states", "useStates", lambda c: c.metrics.get("use_states", 0), 5),
-    GodRule("custom_hooks", "custom hooks", lambda c: c.metrics.get("custom_hooks", 0), 8),
-    GodRule("hook_total", "total hooks", lambda c: c.metrics.get("hook_total", 0), 10),
+    # Vue 3 god-component rules (replaces React hook metrics)
+    GodRule(
+        "watch_count", "watch/watchEffect calls",
+        lambda c: c.metrics.get("watch_count", 0), 5,
+    ),
+    GodRule(
+        "composable_count", "composable (useXyz) calls",
+        lambda c: c.metrics.get("composable_count", 0), 10,
+    ),
+    GodRule(
+        "ref_count", "ref declarations",
+        lambda c: c.metrics.get("ref_count", 0), 10,
+    ),
+    GodRule(
+        "lifecycle_count", "lifecycle hooks",
+        lambda c: c.metrics.get("lifecycle_count", 0), 4,
+    ),
+    GodRule(
+        "prop_count", "defineProps fields",
+        lambda c: c.metrics.get("prop_count", 0), 14,
+    ),
 ]
 
 TS_SKIP_NAMES = {
