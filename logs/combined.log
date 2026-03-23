@@ -1,6 +1,0 @@
-2026-03-23 10:22:11.383 [info]: MCP Server started successfully {"name":"LMStudio","version":"1.0.0","lmStudioUrl":"http://localhost:1234"}
-2026-03-23 10:22:11.386 [info]: Available tools: generate_docs, summarize, extract_tags, analyze_code, refactor_suggestions, generate_tests, process_markdown, summarize_markdown, tag_markdown, analyze_markdown
-2026-03-23 10:22:11.423 [info]: Listing available tools
-2026-03-23 10:22:11.425 [error]: LM Studio health check failed {"error":{"cause":{}}}
-2026-03-23 10:23:11.385 [error]: LM Studio health check failed {"error":{"cause":{}}}
-2026-03-23 10:24:11.385 [error]: LM Studio health check failed {"error":{"cause":{}}}
