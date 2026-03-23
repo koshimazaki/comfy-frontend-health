@@ -67,10 +67,9 @@ def _detect_structural_signals(
         add_structural_signal(
             structural,
             entry["file"],
-            f"{entry['detail'].get('hook_total', 0)} hooks ({', '.join(entry['reasons'][:2])})",
+            f"god component: {', '.join(entry['reasons'][:2])}",
             {
-                "hook_total": entry["detail"].get("hook_total", 0),
-                "hook_reasons": entry["reasons"],
+                "reasons": entry["reasons"],
             },
         )
 

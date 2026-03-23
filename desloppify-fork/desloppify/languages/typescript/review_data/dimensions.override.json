@@ -11,7 +11,7 @@
         "Widespread one-implementation interface ecosystems that add naming ceremony without substitution value"
       ],
       "skip": [
-        "React/Next.js framework composition patterns required by routing or lifecycle boundaries",
+        "Vue/Nuxt framework composition patterns required by routing or lifecycle boundaries",
         "Wrappers that intentionally add auth, telemetry, caching, feature flags, or retries",
         "Public API typing shells that isolate external SDK volatility",
         "Intentional barrel/facade exports that define stable package entry points"

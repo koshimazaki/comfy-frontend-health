@@ -31,29 +31,54 @@ _COMPONENT_PATTERNS = [
 
 
 def extract_ts_components(path: Path) -> list[ClassInfo]:
-    """Extract React component hook metrics from TSX files."""
+    """Extract Vue 3 component composition metrics from .vue and .ts files."""
+    from desloppify.base.discovery.source import find_source_files
+
     results = []
-    for filepath in find_tsx_files(path):
+    for filepath in find_source_files(path, [".vue", ".ts", ".tsx"]):
         try:
             p = (
                 Path(filepath)
                 if Path(filepath).is_absolute()
                 else get_project_root() / filepath
             )
-            content = p.read_text()
+            content = p.read_text(errors="replace")
             lines = content.splitlines()
             loc = len(lines)
-            if loc < 100:
+            if loc < 50:
                 continue
 
-            context_hooks = len(re.findall(r"use\w+Context\s*\(", content))
-            use_effects = len(re.findall(r"useEffect\s*\(", content))
-            use_states = len(re.findall(r"useState\s*[<(]", content))
-            use_refs = len(re.findall(r"useRef\s*[<(]", content))
-            all_use_hooks = len(re.findall(r"use[A-Z]\w+\s*\(", content))
-            custom_hooks = max(
-                0, all_use_hooks - context_hooks - use_effects - use_states - use_refs
+            watch_count = len(
+                re.findall(r"\bwatch(?:(?:Sync|Post)?Effect)?\s*\(", content)
             )
+            ref_count = len(
+                re.findall(r"\b(?:ref|shallowRef|toRef)\s*[<(]", content)
+            )
+            lifecycle_count = len(
+                re.findall(
+                    r"\b(?:onMounted|onUnmounted|onBeforeMount|onBeforeUnmount"
+                    r"|onUpdated|onBeforeUpdate|onActivated|onDeactivated"
+                    r"|onErrorCaptured)\s*\(",
+                    content,
+                )
+            )
+            composable_count = len(
+                re.findall(r"\buse[A-Z]\w+\s*\(", content)
+            )
+
+            # Count defineProps fields (approximate via destructuring or type params)
+            prop_match = re.search(
+                r"defineProps\s*<\s*\{([^}]*)\}", content, re.DOTALL
+            )
+            prop_count = 0
+            if prop_match:
+                prop_count = len(
+                    [p for p in prop_match.group(1).split("\n") if ":" in p]
+                )
+
+            total = watch_count + ref_count + lifecycle_count + composable_count
+            if total < 3:
+                continue
 
             results.append(
                 ClassInfo(
@@ -62,21 +87,17 @@ def extract_ts_components(path: Path) -> list[ClassInfo]:
                     line=1,
                     loc=loc,
                     metrics={
-                        "context_hooks": context_hooks,
-                        "use_effects": use_effects,
-                        "use_states": use_states,
-                        "use_refs": use_refs,
-                        "custom_hooks": custom_hooks,
-                        "hook_total": context_hooks
-                        + use_effects
-                        + use_states
-                        + use_refs,
+                        "watch_count": watch_count,
+                        "composable_count": composable_count,
+                        "ref_count": ref_count,
+                        "lifecycle_count": lifecycle_count,
+                        "prop_count": prop_count,
                     },
                 )
             )
         except (OSError, UnicodeDecodeError) as exc:
             logger.debug(
-                "Skipping unreadable TSX file %s in component extraction: %s",
+                "Skipping unreadable file %s in component extraction: %s",
                 filepath,
                 exc,
             )

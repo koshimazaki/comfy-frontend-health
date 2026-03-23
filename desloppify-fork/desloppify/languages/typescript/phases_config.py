@@ -42,14 +42,17 @@ TS_COMPLEXITY_SIGNALS = [
     ),
     # Vue 3 signals (replaces React useEffect/useRef)
     ComplexitySignal(
-        "watch calls", r"(?:watch|watchEffect)\s*\(", weight=3, threshold=3
+        "watch calls",
+        r"\bwatch(?:(?:Sync|Post)?Effect)?\s*\(",
+        weight=3,
+        threshold=3,
     ),
     ComplexitySignal(
         "composable calls", r"\buse[A-Z]\w+\s*\(", weight=1, threshold=8
     ),
     ComplexitySignal(
         "lifecycle hooks",
-        r"\b(?:onMounted|onUnmounted|onBeforeMount|onBeforeUnmount|onUpdated)\s*\(",
+        r"\b(?:onMounted|onUnmounted|onBeforeMount|onBeforeUnmount|onUpdated|onBeforeUpdate|onActivated|onDeactivated|onErrorCaptured)\s*\(",
         weight=2,
         threshold=4,
     ),
@@ -97,7 +100,7 @@ TS_SKIP_NAMES = {
     "settings.tsx",
     "main.ts",
     "main.tsx",
-    "App.tsx",
+    "App.vue",
     "vite-env.d.ts",
 }
 

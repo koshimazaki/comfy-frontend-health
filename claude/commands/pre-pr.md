@@ -35,7 +35,7 @@ Run targeted grep checks for patterns that ESLint/oxlint don't catch:
 
 ```bash
 # Check changed files only (faster)
-CHANGED=$(git diff --name-only HEAD~1 -- '*.vue' '*.ts' '*.tsx' | grep -v node_modules | grep -v '.test.' | grep -v '.spec.')
+CHANGED=$(git diff --name-only HEAD~1 -- '*.vue' '*.ts' | grep -v node_modules | grep -v '.test.' | grep -v '.spec.')
 ```
 
 For each changed file, check for:

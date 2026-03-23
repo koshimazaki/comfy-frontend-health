@@ -153,10 +153,10 @@ CRITICAL: Flag any re-implementation of existing functionality:
 - **Tailwind CSS**: Custom CSS instead of utility classes
 - **PrimeVue**: Re-implementing buttons, modals, dropdowns, etc.
 - **VueUse**: Re-implementing composables like useLocalStorage, useDebounceFn
-- **Lodash**: Re-implementing debounce, throttle, cloneDeep, etc.
+- **Lodash/es-toolkit**: Using lodash instead of es-toolkit (project standard)
 - **Common components**: Not reusing from src/components/common/
 - **DOMPurify**: Not using for HTML sanitization
-- **Other libraries**: Fuse.js, Marked, Pinia, Zod, Tiptap, Xterm.js, Axios
+- **Other libraries**: Fuse.js, Marked, Pinia, Zod, Tiptap, Xterm.js
 
 ### 3.4 Security Deep Dive
 
