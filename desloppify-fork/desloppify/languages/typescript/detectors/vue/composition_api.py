@@ -40,6 +40,8 @@ def detect_composition_api(path: Path) -> tuple[list[dict], int]:
                     "detector": "vue_options_api",
                     "summary": "Uses Options API instead of <script setup> Composition API",
                     "line": _find_line(content, r"export\s+default\s*\{"),
+                    "severity": "critical",
+                    "agents_md_ref": "Composition API > Never Options API",
                 }
             )
 
@@ -51,6 +53,8 @@ def detect_composition_api(path: Path) -> tuple[list[dict], int]:
                     "detector": "vue_with_defaults",
                     "summary": "Uses withDefaults — use Vue 3.5 props destructuring with defaults instead",
                     "line": _find_line(content, r"\bwithDefaults\s*\("),
+                    "severity": "warning",
+                    "agents_md_ref": "Composition API > Avoid withDefaults",
                 }
             )
 
@@ -62,6 +66,8 @@ def detect_composition_api(path: Path) -> tuple[list[dict], int]:
                     "detector": "vue_runtime_props",
                     "summary": "Uses runtime props declaration — use type-only defineProps<{...}>()",
                     "line": _find_line(content, r"defineProps\s*\(\s*\{"),
+                    "severity": "critical",
+                    "agents_md_ref": "Composition API > Never runtime props",
                 }
             )
 
@@ -73,6 +79,8 @@ def detect_composition_api(path: Path) -> tuple[list[dict], int]:
                     "detector": "vue_define_slots",
                     "summary": "Uses defineSlots — define slots via template usage instead",
                     "line": _find_line(content, r"\bdefineSlots\b"),
+                    "severity": "warning",
+                    "agents_md_ref": "Composition API > Avoid defineSlots",
                 }
             )
 
@@ -91,6 +99,8 @@ def detect_composition_api(path: Path) -> tuple[list[dict], int]:
                     "detector": "vue_missing_define_model",
                     "summary": "Uses modelValue prop + update:modelValue emit — use defineModel instead",
                     "line": _find_line(content, r"modelValue"),
+                    "severity": "warning",
+                    "agents_md_ref": "Composition API > Prefer defineModel",
                 }
             )
 

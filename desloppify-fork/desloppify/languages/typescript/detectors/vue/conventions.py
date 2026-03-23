@@ -51,6 +51,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                             content, r"@ts-(?:expect-error|ignore)"
                         ),
                         "count": len(ts_suppress),
+                        "severity": "warning",
+                        "agents_md_ref": "TypeScript > Avoid @ts-expect-error",
                     }
                 )
 
@@ -64,6 +66,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                     "summary": f"Uses z.any() ({count}x) — use z.unknown() then narrow",
                     "line": _find_line(content, r"z\.any\(\)"),
                     "count": count,
+                    "severity": "warning",
+                    "agents_md_ref": "TypeScript > Avoid z.any()",
                 }
             )
 
@@ -75,6 +79,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                     "detector": "playwright_wait_timeout",
                     "summary": "Uses waitForTimeout — use Locator actions and retrying assertions instead",
                     "line": _find_line(content, r"waitForTimeout\s*\("),
+                    "severity": "warning",
+                    "agents_md_ref": "Testing > Avoid waitForTimeout",
                 }
             )
 
@@ -89,6 +95,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                         "detector": "vue_script_no_setup",
                         "summary": "Uses <script> without setup — use <script setup lang='ts'>",
                         "line": _find_line(content, r"<script\b"),
+                        "severity": "critical",
+                        "agents_md_ref": "Composition API > Never Options API",
                     }
                 )
 
@@ -107,6 +115,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                         "detector": "composable_naming",
                         "summary": f"Composable '{basename}.ts' does not follow useXyz naming convention",
                         "line": 1,
+                        "severity": "info",
+                        "agents_md_ref": "Conventions > Prefer useXyz naming",
                     }
                 )
 
@@ -125,6 +135,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                         "detector": "store_naming",
                         "summary": f"Store '{basename}.ts' does not follow *Store naming convention",
                         "line": 1,
+                        "severity": "info",
+                        "agents_md_ref": "Conventions > Prefer *Store naming",
                     }
                 )
 
@@ -147,6 +159,8 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
                             r"^export\s+(?:const|let)\s+\w+\s*=\s*(?:\([^)]*\)\s*=>|function\b)",
                         ),
                         "count": len(func_expr_matches),
+                        "severity": "warning",
+                        "agents_md_ref": "TypeScript > Avoid function expressions",
                     }
                 )
 

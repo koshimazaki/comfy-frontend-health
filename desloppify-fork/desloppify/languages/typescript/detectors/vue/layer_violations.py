@@ -64,6 +64,8 @@ def detect_layer_violations(path: Path) -> tuple[list[dict], int]:
                             "target_layer": target_layer,
                             "import_path": import_path,
                         },
+                        "severity": "critical",
+                        "agents_md_ref": "Architecture > Never violate layer imports",
                     }
                 )
 

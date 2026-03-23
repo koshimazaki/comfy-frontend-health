@@ -48,6 +48,8 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                         "detector": "primevue_import",
                         "summary": "Imports PrimeVue component — use Reka UI primitives + shadcn-vue instead",
                         "line": _find_line(content, pattern),
+                        "severity": "critical",
+                        "agents_md_ref": "Components > Never PrimeVue imports",
                     }
                 )
                 break
@@ -62,6 +64,8 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                     "summary": f"Uses 'as any' ({count}x) — fix the underlying type issue",
                     "line": _find_line(content, r"\bas\s+any\b"),
                     "count": count,
+                    "severity": "critical",
+                    "agents_md_ref": "TypeScript > Never use any",
                 }
             )
 
@@ -75,6 +79,8 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                     "summary": f"Uses 'any' type ({bare_only_count}x) — use proper TypeScript types",
                     "line": _find_line(content, r":\s*any\b"),
                     "count": bare_only_count,
+                    "severity": "critical",
+                    "agents_md_ref": "TypeScript > Never use any",
                 }
             )
 
@@ -91,6 +97,8 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                     "detector": "mixed_import_type",
                     "summary": "Uses inline 'type' in mixed import — use separate import type statement",
                     "line": _find_line(content, r"import\s*\{[^}]*,\s*type\s+\w+"),
+                    "severity": "warning",
+                    "agents_md_ref": "TypeScript > Avoid mixed import type",
                 }
             )
 
@@ -108,6 +116,8 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                         content,
                         r"(?:await\s+)?fetch\s*\(\s*['\"`]/(?:api|prompt|history|queue)",
                     ),
+                    "severity": "warning",
+                    "agents_md_ref": "Architecture > Avoid direct fetch",
                 }
             )
 
@@ -123,6 +133,36 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                         "detector": "barrel_file",
                         "summary": f"Barrel file ({export_from_count} re-exports) — avoid index.ts re-exports within src/",
                         "line": 1,
+                        "severity": "critical",
+                        "agents_md_ref": "Architecture > Never barrel files",
+                    }
+                )
+
+        # Lodash imports (should use es-toolkit or VueUse)
+        if re.search(r"""from\s+['"]lodash""", content):
+            issues.append(
+                {
+                    "file": filepath,
+                    "detector": "lodash_import",
+                    "summary": "Imports lodash — use es-toolkit or VueUse equivalent instead",
+                    "line": _find_line(content, r"""from\s+['"]lodash"""),
+                    "severity": "warning",
+                    "agents_md_ref": "TypeScript > Use es-toolkit not lodash",
+                }
+            )
+
+        # innerHTML usage without DOMPurify sanitization
+        if re.search(r"\binnerHTML\b", content):
+            has_purify = bool(re.search(r"\bDOMPurify\b", content))
+            if not has_purify:
+                issues.append(
+                    {
+                        "file": filepath,
+                        "detector": "unsafe_innerhtml",
+                        "summary": "Uses innerHTML without DOMPurify — sanitize with DOMPurify.sanitize() or use textContent",
+                        "line": _find_line(content, r"\binnerHTML\b"),
+                        "severity": "critical",
+                        "agents_md_ref": "Security > Never raw innerHTML",
                     }
                 )
 

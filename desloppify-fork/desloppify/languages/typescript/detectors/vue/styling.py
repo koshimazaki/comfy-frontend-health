@@ -54,6 +54,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                     "detector": "tailwind_class_array",
                     "summary": 'Uses :class="[]" array — use cn() from @/utils/tailwindUtil instead',
                     "line": _find_line(content, r':class="\['),
+                    "severity": "warning",
+                    "agents_md_ref": "Styling > Avoid :class array syntax",
                 }
             )
 
@@ -65,6 +67,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                     "detector": "tailwind_dark_variant",
                     "summary": "Uses dark: variant — use semantic theme tokens from style.css instead",
                     "line": _find_line(content, r"\bdark:"),
+                    "severity": "warning",
+                    "agents_md_ref": "Styling > Avoid dark: variant",
                 }
             )
 
@@ -79,6 +83,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                         content,
                         r"(?<=['\"`\s])!(?:bg-|text-|border-|p-|m-|w-|h-|flex|grid)",
                     ),
+                    "severity": "warning",
+                    "agents_md_ref": "Styling > Avoid !important",
                 }
             )
 
@@ -92,6 +98,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                         "detector": "tailwind_arbitrary_pct",
                         "summary": f"Uses arbitrary [{pct}] — use {frac} fraction utility instead",
                         "line": _find_line(content, pattern),
+                        "severity": "info",
+                        "agents_md_ref": "Styling > Prefer fraction utilities",
                     }
                 )
                 break  # One per file
@@ -109,6 +117,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                             "detector": "vue_style_block",
                             "summary": "Has <style> block — use inline Tailwind CSS only (exception: :deep() for third-party DOM)",
                             "line": _find_line(content, r"<style[\s>]"),
+                            "severity": "warning",
+                            "agents_md_ref": "Styling > Avoid style blocks",
                         }
                     )
 
@@ -124,6 +134,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                     "detector": "tailwind_raw_color",
                     "summary": "Uses raw Tailwind color class — use semantic tokens (bg-primary-background, text-muted-foreground, etc.)",
                     "line": content[: raw_color_match.start()].count("\n") + 1,
+                    "severity": "warning",
+                    "agents_md_ref": "Styling > Never raw colors",
                 }
             )
 
@@ -135,6 +147,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                     "detector": "hardcoded_color_value",
                     "summary": "Uses hardcoded hex color in class/style — use semantic tokens from style.css",
                     "line": _find_line(content, r'(?:class|style)=["\'][^"\']*#[0-9a-fA-F]{3,8}'),
+                    "severity": "warning",
+                    "agents_md_ref": "Styling > Never raw colors",
                 }
             )
 

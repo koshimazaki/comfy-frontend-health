@@ -100,6 +100,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                                 "summary": f"<{trigger}> without as-child creates unnecessary wrapper div",
                                 "line": content[: match.start()].count("\n")
                                 + 1,
+                                "severity": "warning",
+                                "agents_md_ref": "Reka UI > Avoid missing as-child",
                             }
                         )
                         break  # One per trigger type per file
@@ -118,6 +120,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                             "line": _find_line(
                                 content, re.escape(html_elem)
                             ),
+                            "severity": "warning",
+                            "agents_md_ref": "Reka UI > Prefer primitives over native HTML",
                         }
                     )
                     break  # One per file
@@ -143,6 +147,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                                     "line": _find_line(
                                         content, rf"<{root}\b"
                                     ),
+                                    "severity": "warning",
+                                    "agents_md_ref": "Reka UI > Avoid missing useForwardPropsEmits",
                                 }
                             )
                             break  # One per file
@@ -160,6 +166,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                     "line": _find_line(
                         content, r"from\s+['\"]primevue/"
                     ),
+                    "severity": "critical",
+                    "agents_md_ref": "Components > Never PrimeVue imports",
                 }
             )
 
@@ -173,6 +181,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                         "detector": "cva_inline_in_component",
                         "summary": "CVA variants defined inline — extract to colocated .variants.ts file",
                         "line": _find_line(content, r"\bcva\s*\(\s*\{"),
+                        "severity": "warning",
+                        "agents_md_ref": "Styling > Avoid CVA inline in component",
                     }
                 )
 
@@ -186,6 +196,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                         "detector": "missing_story",
                         "summary": "UI component missing colocated .stories.ts file",
                         "line": 1,
+                        "severity": "warning",
+                        "agents_md_ref": "Components > Prefer colocated stories",
                     }
                 )
 
@@ -207,6 +219,8 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                                 "detector": "reka_manual_state_toggle",
                                 "summary": "Uses v-if/v-show for open state — let Reka UI manage via data-[state=open]",
                                 "line": content[: manual_toggle.start()].count("\n") + 1,
+                                "severity": "warning",
+                                "agents_md_ref": "Reka UI > Avoid manual state toggle",
                             }
                         )
                         break
