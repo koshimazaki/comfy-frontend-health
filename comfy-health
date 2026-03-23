@@ -6,6 +6,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_PATH="${COMFY_FRONTEND_PATH:-.}"
+LOG_FILE="${COMFY_HEALTH_LOG:-$SCRIPT_DIR/.comfy-health.log}"
+
+# ── Score logging (temporary: track how scores change as we use the tool) ──
+# Appends a TSV line: timestamp, branch, commit, subcommand, issue_count, notes
+# Inspired by Karpathy's autoresearch ratchet pattern.
+# Review .comfy-health.log periodically to see if the tool is helping.
+log_run() {
+  local subcmd="$1" issues="${2:-}" notes="${3:-}"
+  local ts branch commit
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  branch=$(cd "$PROJECT_PATH" && git symbolic-ref --short HEAD 2>/dev/null || echo "detached")
+  commit=$(cd "$PROJECT_PATH" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  echo -e "${ts}\t${branch}\t${commit}\t${subcmd}\t${issues}\t${notes}" >> "$LOG_FILE"
+}
 
 usage() {
   cat <<'EOF'
@@ -107,10 +121,12 @@ case "$cmd" in
     echo ""
     output=""
     while IFS= read -r f; do
-      result=$(python -m desloppify show "$f" --no-budget 2>/dev/null || true)
+      result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
       [[ -n "$result" ]] && output+="$result"$'\n'
       echo "$result"
     done <<< "$files"
+    issue_count=$(echo "$output" | grep -c -v '^$' || true)
+    log_run "diff" "$issue_count" "ref:$ref"
     if $strict && [[ -n "$(echo "$output" | grep -v '^$')" ]]; then
       exit 1
     fi
@@ -138,10 +154,12 @@ case "$cmd" in
     echo ""
     output=""
     while IFS= read -r f; do
-      result=$(python -m desloppify show "$f" --no-budget 2>/dev/null || true)
+      result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
       [[ -n "$result" ]] && output+="$result"$'\n'
       echo "$result"
     done <<< "$files"
+    issue_count=$(echo "$output" | grep -c -v '^$' || true)
+    log_run "branch" "$issue_count" "base:$base"
     if $strict && [[ -n "$(echo "$output" | grep -v '^$')" ]]; then
       exit 1
     fi
@@ -220,7 +238,11 @@ case "$cmd" in
   # Commands that accept --path
   scan|tree|viz|detect|move|exclude)
     shift
-    exec python3 -m desloppify "$cmd" --path "$PROJECT_PATH" "$@"
+    log_run "$cmd" "" "started"
+    python3 -m desloppify "$cmd" --path "$PROJECT_PATH" "$@"
+    rc=$?
+    log_run "$cmd" "" "exit:$rc"
+    exit $rc
     ;;
   # Commands that use --state (no --path flag)
   status|next|backlog|plan|show|autofix|suppress|review|zone)

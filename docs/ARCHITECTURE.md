@@ -323,6 +323,33 @@ All checks added as subquestions in code-reviewer agent, scoring signals in /beh
 - **Fixed** `pre-pr.md` grep logic inversion for ComfyPage detection
 - **Fixed** dead code branch in `check` subcommand
 
+### Score Logging (temporary)
+
+- Added TSV logging to `comfy-health` CLI (`scan`, `diff`, `branch` subcommands)
+- Each run appends: timestamp, branch, commit, subcommand, issue count, notes
+- Log file: `.comfy-health.log` (gitignored)
+- Purpose: track whether the tool actually helps reduce issues over time (autoresearch ratchet pattern)
+- Review the log after battle testing to decide if a proper ratchet (auto-discard regressions) is worth building
+
+### Scan Accuracy Calibration
+
+First real-world test (app-layouts-lite branch, 120 changed files) revealed scan inflation:
+
+| Claimed | Verified | Accuracy |
+|---------|----------|----------|
+| 61 issues across 35 files | ~15 genuinely new and actionable | ~25% signal |
+| Score: 70.9/100 | Actual branch health: solid | Pessimistic |
+
+**Root causes of false positives:**
+- Pre-existing debt blamed on the branch (PrimeVue imports, god components, z.any())
+- JSON deep-clone (`JSON.parse(JSON.stringify())`) flagged as "security" — should be "bad practice"
+- Test coverage inflated — counted pre-existing untested files and files with indirect coverage
+- Importer count missed dynamic imports and template usage
+
+**What worked well:** Tier 1 findings (lint blockers, unprotected JSON.parse, layer violations), god store detection, semantic token violations in new files.
+
+**Action needed:** Branch-scoping is the highest priority fix — scan must diff against base branch to separate new issues from pre-existing debt. The 3-tier presentation (fix before merge / should fix / defer) is the right output format.
+
 ## Roadmap
 
 ### Scan result caching & delta tracking
