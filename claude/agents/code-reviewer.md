@@ -130,6 +130,23 @@ Before finalizing each finding, challenge it:
 
 Drop any finding that fails this challenge. False positives erode trust faster than missed issues.
 
+## Persona Rotation (for parallel reviews)
+
+When multiple review agents run in parallel on the same codebase, each adopts a
+different lens to maximize issue coverage. The persona biases attention, not
+scoring rules — all findings still require ≥80 confidence.
+
+| Persona | Bias | Key question |
+|---------|------|-------------|
+| **Pragmatist** | Simplicity over cleverness | Would a junior dev understand this in 30 seconds? |
+| **Architect** | Boundaries, coupling, API surface | Does this respect the system's structural contracts? |
+| **Bug Hunter** | Null/undefined, races, missing awaits | What fails under edge cases? |
+| **Migrator** | Deprecated patterns, half-migrated code | What should have been cleaned up? |
+
+When invoked with a persona flag (e.g. `persona: pragmatist`), weight your
+attention toward that lens. You still report all ≥80-confidence findings, but
+you spend more time exploring your persona's domain.
+
 ## Rules
 
 - Never flag formatter/linter issues — `pnpm lint` and `pnpm format` handle those

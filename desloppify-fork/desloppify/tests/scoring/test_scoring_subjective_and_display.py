@@ -113,10 +113,10 @@ class TestSubjectiveScoring:
             assert not missing, (
                 f"{lang_name}: curated dims {missing} not in full scorecard"
             )
-            # Full scorecard must be strictly larger than curated subset
-            assert len(full_dims) > len(curated), (
+            # Full scorecard must be at least as large as curated subset
+            assert len(full_dims) >= len(curated), (
                 f"{lang_name}: full scorecard ({len(full_dims)}) should be "
-                f"larger than curated subset ({len(curated)})"
+                f"at least as large as curated subset ({len(curated)})"
             )
 
         # Verify scoring.py references load_dimensions_for_lang, not

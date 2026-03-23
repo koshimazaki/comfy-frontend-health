@@ -45,9 +45,9 @@ The `/behavioral-health` command and the `test_strategy` review dimension focus 
 Every command, dimension, and detector was evaluated against: "Can this be simpler?" Results:
 
 - **Merged** `/test-coverage-gaps` into `/behavioral-health` — they asked the same question
-- **Collapsed** 24 review dimensions → 20 — `behavioral_coverage`, `regression_safety`, `test_confidence` were three phrasings of one concept; folded into `test_strategy`
+- **Collapsed** 24 review dimensions → 21 — `behavioral_coverage`, `regression_safety`, `test_confidence` folded into `test_strategy`; `implementation_simplicity` checks migrated to `logic_clarity` guidance; added `performance_awareness`
 - **Simplified** `/pre-pr` from 5 phases → 2 default stages + 2 opt-in flags
-- **Kept** one agent — no evidence that specialized agents catch more than a strong generalist
+- **Kept** one agent with **persona rotation** — parallel reviews use different lenses (Pragmatist/Architect/Bug Hunter/Migrator) instead of separate specialized agents
 
 ## What it adds over upstream desloppify
 
@@ -126,7 +126,7 @@ Python regex scanners in `desloppify-fork/desloppify/languages/typescript/detect
 
 ## Review Rubric
 
-`review_comfy.py` provides 20 scoring dimensions (14 upstream + 6 ComfyUI-specific) and 8 guidance categories with 53 total checks:
+`review_comfy.py` provides 21 scoring dimensions (14 upstream + 7 ComfyUI-specific) and 10 guidance categories with 65 total checks:
 
 | Category | Checks | Covers |
 |----------|--------|--------|
@@ -136,6 +136,8 @@ Python regex scanners in `desloppify-fork/desloppify/languages/typescript/detect
 | architecture | 5 | layer violations, barrel files, naming, PrimeVue |
 | testing | 10 | change-detectors, mock-only, behavioral coverage, regression tests |
 | design_system | 11 | component inventory, CVA, as-child, forward props, data-[state], stories |
+| logic_clarity | 5 | unnecessary abstractions, nesting, expression simplification, generics |
+| performance | 6 | O(n²), cleanup leaks, expensive watchers, lazy loading, layout thrashing |
 | i18n | 3 | vue-i18n usage, locale files, pluralization |
 | naming | 1 | camelCase/PascalCase consistency |
 
@@ -171,6 +173,51 @@ Python regex scanners in `desloppify-fork/desloppify/languages/typescript/detect
 | `**/*.ts` | `typescript.md` — Type safety, Zod, API utilities, circular deps |
 
 ## Architecture
+
+```mermaid
+flowchart TD
+    subgraph Engine["desloppify engine"]
+        CATALOG["subjective_dimension_catalog.py\n21 dimensions + weights"]
+        DIMS_JSON["dimensions.json\nprompts, look_for, skip"]
+        OVERRIDE["dimensions.override.json\nTS-specific + persona rotation"]
+    end
+
+    subgraph LangPlugin["TypeScript / Vue 3 Plugin"]
+        REVIEW_COMFY["review_comfy.py\n21 HOLISTIC_REVIEW_DIMENSIONS\n10 REVIEW_GUIDANCE keys"]
+        PHASES_VUE["phases_vue.py\n6 detector modules"]
+        DETECTORS["detectors/vue/\ncomposition, styling,\ncomponents, layers,\nconventions, reka"]
+    end
+
+    subgraph AgentLayer["Claude Agent Layer"]
+        REVIEWER["code-reviewer agent\npersona rotation"]
+        PRE_PR["/pre-pr command"]
+        BEHAVIORAL["/behavioral-health"]
+        DESLOP["/comfy-deslop"]
+    end
+
+    subgraph Personas["Parallel Review Personas"]
+        P1["Pragmatist\nsimplicity bias"]
+        P2["Architect\nboundary bias"]
+        P3["Bug Hunter\nedge case bias"]
+        P4["Migrator\ndeprecation bias"]
+    end
+
+    CATALOG --> DIMS_JSON
+    DIMS_JSON --> OVERRIDE
+    OVERRIDE --> REVIEW_COMFY
+    REVIEW_COMFY --> PHASES_VUE
+    PHASES_VUE --> DETECTORS
+    REVIEW_COMFY --> REVIEWER
+    REVIEWER --> P1
+    REVIEWER --> P2
+    REVIEWER --> P3
+    REVIEWER --> P4
+    PRE_PR --> REVIEWER
+    DESLOP --> REVIEWER
+    BEHAVIORAL --> REVIEWER
+```
+
+### File Structure
 
 ```
 comfy-frontend-health/
@@ -232,10 +279,19 @@ comfy-frontend-health/
 ### YAGNI Simplification Pass
 
 - **Merged** `/test-coverage-gaps` into `/behavioral-health` (same question, one command)
-- **Collapsed** review dimensions 24 → 20 (3 test dimensions → `test_strategy`, `implementation_simplicity` → `logic_clarity`)
+- **Collapsed** review dimensions 24 → 21 (3 test dimensions → `test_strategy`, `implementation_simplicity` → `logic_clarity`)
 - **Simplified** `/pre-pr` from 5 phases (1, 2, 3, 3b, 3c) → 2 stages + 2 opt-in flags
 - **Kept** single code-reviewer agent (no specialized agent swarm)
 - Behavioral test quality folded into `testing` guidance (10 checks, was 7 + 3 separate categories)
+
+### Post-YAGNI Fixes (logic_clarity gap, weights, performance, personas)
+
+- **Fixed** `logic_clarity` guidance gap — 5 simplicity checks restored from deleted `implementation_simplicity` (abstractions, nesting, expression simplification, generics, overall simplicity)
+- **Added** `performance_awareness` dimension (21st) — O(n²), cleanup leaks, expensive watchers, lazy loading, layout thrashing
+- **Added** weights for `test_strategy` (8.0) and `dependency_health` (4.0) — previously defaulting to 1.0
+- **Added** `performance` guidance category (6 checks) to `COMFY_REVIEW_GUIDANCE`
+- **Added** persona rotation for parallel reviews (Pragmatist/Architect/Bug Hunter/Migrator) via `system_prompt_append`
+- **Consolidated** `subjective_dimensions_constants.py` — removed duplicate `DISPLAY_NAMES` dict, now imports from `subjective_dimension_catalog.py`
 
 ## Recommendations for Future Agents
 

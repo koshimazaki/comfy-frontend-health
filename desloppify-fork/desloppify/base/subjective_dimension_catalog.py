@@ -26,6 +26,7 @@ DISPLAY_NAMES: dict[str, str] = {
     "logic_clarity": "Logic clarity",
     "type_safety": "Type safety",
     "contract_coherence": "Contracts",
+    "performance_awareness": "Performance",
 }
 
 _SUBJECTIVE_WEIGHTS_BY_DISPLAY: dict[str, float] = {
@@ -34,13 +35,16 @@ _SUBJECTIVE_WEIGHTS_BY_DISPLAY: dict[str, float] = {
     "low elegance": 12.0,
     "contracts": 12.0,
     "type safety": 12.0,
+    "design coherence": 10.0,
+    "test strategy": 8.0,
     "abstraction fit": 8.0,
     "logic clarity": 6.0,
     "structure nav": 5.0,
+    "performance": 5.0,
+    "dep health": 4.0,
     "error consistency": 3.0,
     "naming quality": 2.0,
     "ai generated debt": 1.0,
-    "design coherence": 10.0,
 }
 
 RESET_ON_SCAN_DIMENSIONS: frozenset[str] = frozenset(
@@ -56,6 +60,7 @@ RESET_ON_SCAN_DIMENSIONS: frozenset[str] = frozenset(
         "high_level_elegance",
         "mid_level_elegance",
         "low_level_elegance",
+        "performance_awareness",
     }
 )
 

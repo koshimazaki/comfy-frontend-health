@@ -19,7 +19,8 @@
     "authorization_consistency",
     "incomplete_migration",
     "package_organization",
-    "design_coherence"
+    "design_coherence",
+    "performance_awareness"
   ],
   "dimension_prompts": {
     "naming_quality": {
@@ -381,6 +382,28 @@
       "meta": {
         "display_name": "Design coherence",
         "weight": 10.0,
+        "reset_on_scan": true
+      }
+    },
+    "performance_awareness": {
+      "description": "Runtime performance: avoidable O(n²), memory leaks, unnecessary re-renders, heavy imports",
+      "look_for": [
+        "Nested loops over collections that produce O(n²) or worse (e.g. .find inside .map)",
+        "Missing cleanup for subscriptions, event listeners, or intervals in component lifecycle",
+        "Computed properties or watchers that trigger expensive recalculation on every render",
+        "Large library imports that could be tree-shaken or lazy-loaded",
+        "Deep reactive watchers on large objects causing unnecessary cascade",
+        "Synchronous DOM reads followed by writes in the same tick (layout thrashing)"
+      ],
+      "skip": [
+        "Small collections where O(n²) is negligible (< 100 items)",
+        "Framework-required lifecycle patterns (onMounted, useEffect)",
+        "Performance optimizations that would harm readability without measurable gain",
+        "Build-time concerns (bundle size belongs in dependency_health)"
+      ],
+      "meta": {
+        "display_name": "Performance",
+        "weight": 5.0,
         "reset_on_scan": true
       }
     }

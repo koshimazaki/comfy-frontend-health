@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 
 # ── Dimensions ──────────────────────────────────────────────────────────
-# Same 20 upstream dimensions, but rubric text is injected from our skills.
-# The dimension list itself stays compatible with desloppify's scoring engine.
+# 21 dimensions: 14 upstream + 7 ComfyUI-specific.
+# The dimension list stays compatible with desloppify's scoring engine.
 
 COMFY_HOLISTIC_REVIEW_DIMENSIONS: list[str] = [
     # Upstream-compatible dimensions (14):
@@ -28,13 +28,14 @@ COMFY_HOLISTIC_REVIEW_DIMENSIONS: list[str] = [
     "low_level_elegance",
     "design_coherence",
     "initialization_coupling",
-    # ComfyUI-specific dimensions (6):
+    # ComfyUI-specific dimensions (7):
     "naming_quality",
     "contract_coherence",
     "test_strategy",       # covers behavioral coverage, regression safety, test confidence
     "type_safety",
     "logic_clarity",       # covers implementation simplicity
     "dependency_health",
+    "performance_awareness",
 ]
 
 # ── Review guidance ─────────────────────────────────────────────────────
@@ -107,6 +108,21 @@ COMFY_REVIEW_GUIDANCE = {
         "Check new ui/ components have colocated .stories.ts files",
         "Flag native <dialog>, <select>, <details> — use Reka UI primitives",
         "Flag components with >14 props — needs decomposition or composition pattern",
+    ],
+    "logic_clarity": [
+        "Flag unnecessary abstractions — would inlining be clearer?",
+        "Flag deeply nested logic (ArrowAntiPattern) — can early returns flatten it?",
+        "Flag multi-step transformations that could be a single expression",
+        "Flag over-engineered generics when a concrete type suffices",
+        "Is there a simpler way to achieve the same result with fewer moving parts?",
+    ],
+    "performance": [
+        "Flag O(n²) or worse in loops over collections (nested .find/.filter/.includes)",
+        "Check for missing cleanup in onMounted/onUnmounted (event listeners, intervals, subscriptions)",
+        "Flag computed properties that do expensive work without memoization",
+        "Check for large module imports that should be lazy-loaded (dynamic import())",
+        "Flag reactive watchers that trigger unnecessary re-renders (deep watch on large objects)",
+        "Check for layout thrashing patterns (read-then-write DOM in same tick)",
     ],
     "naming": (
         "TypeScript uses camelCase for functions/variables, PascalCase for "

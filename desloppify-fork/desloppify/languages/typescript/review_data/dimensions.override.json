@@ -18,5 +18,5 @@
       ]
     }
   },
-  "system_prompt_append": "TypeScript anchor checks: prop-drilling wrappers, single-implementation interfaces, generic surfaces used in only one concrete path, and recurring wrapper chains across feature boundaries."
+  "system_prompt_append": "TypeScript anchor checks: prop-drilling wrappers, single-implementation interfaces, generic surfaces used in only one concrete path, and recurring wrapper chains across feature boundaries.\n\nPERSONA ROTATION — When reviewing multiple batches in parallel, each batch adopts a different review lens. The persona biases attention, not scoring rules. All dimensions still use their standard rubric.\n\n  PRAGMATIST: Favor simplicity over cleverness. Flag anything a junior dev would struggle with. Ask: would a new team member understand this in 30 seconds?\n  ARCHITECT: Focus on boundary violations, coupling direction, API surface consistency, and layer discipline. Ask: does this change respect the system's structural contracts?\n  BUG_HUNTER: Assume every code path is production-critical. Focus on null/undefined, race conditions, missing awaits, error swallowing, and edge cases that silently corrupt state.\n  MIGRATOR: Flag anything still using deprecated patterns. Focus on half-migrated code, stale shims, dual-path confusion, and patterns that should have been cleaned up."
 }
