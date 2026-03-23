@@ -80,9 +80,9 @@ case "$cmd" in
       [[ "$arg" == "--import" || "$arg" == "--prepare" ]] && has_explicit=true
     done
     if $has_explicit; then
-      exec python -m desloppify review --path "$PROJECT_PATH" "$@"
+      exec python3 -m desloppify review --path "$PROJECT_PATH" "$@"
     else
-      exec python -m desloppify review --prepare --path "$PROJECT_PATH" "$@"
+      exec python3 -m desloppify review --prepare --path "$PROJECT_PATH" "$@"
     fi
     ;;
   # Diff: show known issues for files changed since a ref (default HEAD~1)
@@ -220,20 +220,20 @@ case "$cmd" in
   # Commands that accept --path
   scan|tree|viz|detect|move|exclude)
     shift
-    exec python -m desloppify "$cmd" --path "$PROJECT_PATH" "$@"
+    exec python3 -m desloppify "$cmd" --path "$PROJECT_PATH" "$@"
     ;;
   # Commands that use --state (no --path flag)
   status|next|backlog|plan|show|autofix|suppress|review|zone)
     shift
-    exec python -m desloppify "$cmd" "$@"
+    exec python3 -m desloppify "$cmd" "$@"
     ;;
   # Commands with no path/state args
   config|langs|dev|update-skill)
     shift
-    exec python -m desloppify "$cmd" "$@"
+    exec python3 -m desloppify "$cmd" "$@"
     ;;
   *)
     # Pass-through for anything else
-    exec python -m desloppify "$@"
+    exec python3 -m desloppify "$@"
     ;;
 esac
