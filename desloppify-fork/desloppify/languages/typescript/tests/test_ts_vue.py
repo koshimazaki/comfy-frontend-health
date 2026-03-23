@@ -272,6 +272,19 @@ export function cast(x: unknown) {
         issues, _ = detect_component_violations(tmp_path)
         assert "ts_as_any" in _detectors_for(issues)
 
+    def test_detects_bare_any_type(self, tmp_path: Path):
+        _write_fixture(
+            tmp_path,
+            "src/utils/bad.ts",
+            """\
+export function doStuff(x: any): any {
+  return x
+}
+""",
+        )
+        issues, _ = detect_component_violations(tmp_path)
+        assert "ts_any_type" in _detectors_for(issues)
+
     def test_detects_mixed_import_type(self, tmp_path: Path):
         _write_fixture(
             tmp_path,
@@ -464,6 +477,19 @@ test('something', async ({ page }) => {
         store_issues = [i for i in issues if i["detector"] == "store_naming"]
         assert len(store_issues) == 0
 
+    def test_detects_function_expressions(self, tmp_path: Path):
+        _write_fixture(
+            tmp_path,
+            "src/utils/bad.ts",
+            """\
+export const foo = () => 1
+export const bar = () => 2
+export const baz = () => 3
+""",
+        )
+        issues, _ = detect_conventions(tmp_path)
+        assert "function_expression" in _detectors_for(issues)
+
     def test_detects_script_no_setup(self, tmp_path: Path):
         _write_fixture(
             tmp_path,
@@ -561,6 +587,18 @@ const { modelValue } = defineProps<{ modelValue?: string }>()
         issues, _ = detect_reka_patterns(tmp_path)
         assert "reka_missing_forward_props" in _detectors_for(issues)
 
+    def test_detects_native_html_over_reka(self, tmp_path: Path):
+        _write_fixture(
+            tmp_path,
+            "src/components/Bad.vue",
+            """\
+<script setup lang="ts"></script>
+<template><select><option>A</option></select></template>
+""",
+        )
+        issues, _ = detect_reka_patterns(tmp_path)
+        assert "reka_use_primitive" in _detectors_for(issues)
+
     def test_clean_reka_component_no_issues(self, tmp_path: Path):
         _write_fixture(
             tmp_path,
@@ -587,8 +625,8 @@ import { DialogRoot, DialogTrigger, DialogContent } from 'reka-ui'
 
 
 class TestFalsePositives:
-    def test_dark_in_comment_not_flagged(self, tmp_path: Path):
-        """dark: in a comment about dark mode should not trigger."""
+    def test_dark_in_ts_comment_is_known_false_positive(self, tmp_path: Path):
+        """Regex cannot distinguish dark: in comments from templates — accepted trade-off."""
         _write_fixture(
             tmp_path,
             "src/utils/theme.ts",
@@ -599,11 +637,9 @@ export const theme = 'auto'
 """,
         )
         issues, _ = detect_styling_violations(tmp_path)
-        # ts files with dark: in comments may trigger - this is a known
-        # limitation of regex-based detection. The key is that .css files
-        # are excluded (tested in TestStyling.test_dark_in_css_not_flagged)
-        # For TS files, this is acceptable as it encourages removing the
-        # dark: keyword entirely.
+        # TS files with dark: in comments trigger — known false positive.
+        # CSS files are excluded (tested in test_dark_in_css_not_flagged).
+        assert "tailwind_dark_variant" in _detectors_for(issues)
 
     def test_as_any_in_test_still_flagged(self, tmp_path: Path):
         """as any in test files should still be flagged."""
