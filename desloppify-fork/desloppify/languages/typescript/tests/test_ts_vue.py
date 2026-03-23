@@ -129,12 +129,15 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
         assert "vue_missing_define_model" in _detectors_for(issues)
 
     def test_define_model_present_no_issue(self, tmp_path: Path):
+        """defineModel guard must be the thing that prevents the issue."""
         _write_fixture(
             tmp_path,
             "src/components/Good.vue",
             """\
 <script setup lang="ts">
 const modelValue = defineModel<string>()
+const { otherProp } = defineProps<{ otherProp: number }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 <template><input v-model="modelValue" /></template>
 """,
@@ -329,6 +332,21 @@ export function cast(x: unknown) {
         issues, _ = detect_component_violations(tmp_path)
         assert "ts_as_any" in _detectors_for(issues)
         assert "ts_any_type" not in _detectors_for(issues)
+
+    def test_bare_any_counted_alongside_as_any(self, tmp_path: Path):
+        """When code has both ': any' and 'as any', both detectors fire."""
+        _write_fixture(
+            tmp_path,
+            "src/utils/mixed.ts",
+            """\
+export function cast(x: any) {
+  return x as any
+}
+""",
+        )
+        issues, _ = detect_component_violations(tmp_path)
+        assert "ts_as_any" in _detectors_for(issues)
+        assert "ts_any_type" in _detectors_for(issues)
 
     def test_detects_mixed_import_type(self, tmp_path: Path):
         _write_fixture(

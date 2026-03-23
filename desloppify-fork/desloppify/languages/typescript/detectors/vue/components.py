@@ -65,10 +65,8 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                 }
             )
 
-        # Bare any type (: any, <any>, = any) — excluding 'as any' to avoid double-count
-        all_any_matches = len(re.findall(r"(?::|\<|=)\s*any\b", content))
-        as_any_count = len(re.findall(r"\bas\s+any\b", content))
-        bare_only_count = all_any_matches - as_any_count
+        # Bare any type (: any, <any>, = any) — already mutually exclusive with 'as any'
+        bare_only_count = len(re.findall(r"(?::|\<|=)\s*any\b", content))
         if bare_only_count > 0:
             issues.append(
                 {
