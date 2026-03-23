@@ -36,6 +36,7 @@ _DETECTOR_CONFIG: dict[str, tuple[int, str]] = {
     "vue_with_defaults": (2, "high"),
     "vue_runtime_props": (2, "high"),
     "vue_define_slots": (2, "medium"),
+    "vue_missing_define_model": (2, "medium"),
     # Styling violations — explicit "NEVER" rules
     "tailwind_class_array": (2, "high"),
     "tailwind_dark_variant": (2, "high"),

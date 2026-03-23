@@ -113,6 +113,36 @@ const slots = defineSlots<{ default(): any }>()
         issues, _ = detect_composition_api(tmp_path)
         assert "vue_define_slots" in _detectors_for(issues)
 
+    def test_detects_missing_define_model(self, tmp_path: Path):
+        _write_fixture(
+            tmp_path,
+            "src/components/Bad.vue",
+            """\
+<script setup lang="ts">
+const { modelValue } = defineProps<{ modelValue: string }>()
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
+</script>
+<template><input :value="modelValue" @input="emit('update:modelValue', $event.target.value)" /></template>
+""",
+        )
+        issues, _ = detect_composition_api(tmp_path)
+        assert "vue_missing_define_model" in _detectors_for(issues)
+
+    def test_define_model_present_no_issue(self, tmp_path: Path):
+        _write_fixture(
+            tmp_path,
+            "src/components/Good.vue",
+            """\
+<script setup lang="ts">
+const modelValue = defineModel<string>()
+</script>
+<template><input v-model="modelValue" /></template>
+""",
+        )
+        issues, _ = detect_composition_api(tmp_path)
+        model_issues = [i for i in issues if i["detector"] == "vue_missing_define_model"]
+        assert len(model_issues) == 0
+
     def test_clean_file_no_issues(self, tmp_path: Path):
         _write_fixture(
             tmp_path,

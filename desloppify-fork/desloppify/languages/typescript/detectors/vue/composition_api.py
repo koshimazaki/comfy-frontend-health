@@ -76,6 +76,24 @@ def detect_composition_api(path: Path) -> tuple[list[dict], int]:
                 }
             )
 
+        # defineModel detection: modelValue prop + update:modelValue emit without defineModel
+        has_model_prop = (
+            re.search(r"modelValue", content)
+            and re.search(r"defineProps", content)
+        )
+        has_update_emit = re.search(r"update:modelValue", content)
+        has_define_model = re.search(r"\bdefineModel\b", content)
+
+        if has_model_prop and has_update_emit and not has_define_model:
+            issues.append(
+                {
+                    "file": filepath,
+                    "detector": "vue_missing_define_model",
+                    "summary": "Uses modelValue prop + update:modelValue emit — use defineModel instead",
+                    "line": _find_line(content, r"modelValue"),
+                }
+            )
+
     return issues, total_files
 
 
