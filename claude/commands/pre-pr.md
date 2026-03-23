@@ -88,7 +88,20 @@ if [ -n "$VUE_CHANGED" ]; then
 fi
 ```
 
-### Phase 3b: Code Review (skip with `--quick`)
+### Phase 3b: Behavioral Health (skip with `--quick`)
+
+For each changed source file, verify its tests protect against regressions:
+
+1. Find the corresponding test file
+2. If no test exists → flag as "UNPROTECTED" (warning for utils, blocker for stores/composables)
+3. If test exists → quick read to check:
+   - Does it test behavior through public interface? (good)
+   - Does it only assert mock calls or default values? (weak — flag)
+   - Are error paths covered? (gap if missing)
+
+Rate each file 1-5 risk score. Report files scoring 4+.
+
+### Phase 3c: Code Review (skip with `--quick`)
 
 Invoke the code-reviewer agent on the diff:
 
@@ -132,7 +145,12 @@ Phase 3: Tests
   ✓ Layer audit clean
   ✓ i18n keys valid
 
-Phase 3b: Code Review
+Phase 3b: Behavioral Health
+  🟢 src/stores/settingStore.ts — protected (2/5)
+  🔴 src/composables/useFoo.ts — UNPROTECTED (5/5)
+  ⚠ src/components/Bar.vue — weak tests (4/5, mock-only)
+
+Phase 3c: Code Review
   ⚠ 1 warning: ref+watch could be computed (src/composables/useFoo.ts:23)
   ✓ No critical issues
 
