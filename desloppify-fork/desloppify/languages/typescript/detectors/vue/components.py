@@ -79,8 +79,12 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
             )
 
         # Mixed import type (inline type in mixed imports)
-        # Bad: import { bar, type Foo } from './foo'
-        if re.search(r"import\s*\{[^}]*,\s*type\s+\w+", content):
+        # Bad: import { bar, type Foo } or import { type Foo, bar }
+        has_mixed = (
+            re.search(r"import\s*\{[^}]*,\s*type\s+\w+", content)
+            or re.search(r"import\s*\{\s*type\s+\w+[^}]*,\s*\w+", content)
+        )
+        if has_mixed:
             issues.append(
                 {
                     "file": filepath,
@@ -91,7 +95,7 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
             )
 
         # Direct fetch bypassing api helpers (in src/ files only)
-        if "/src/" in filepath and re.search(
+        if ("/src/" in filepath or filepath.startswith("src/")) and re.search(
             r"(?:await\s+)?fetch\s*\(\s*['\"`]/(?:api|prompt|history|queue)",
             content,
         ):
@@ -108,7 +112,7 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
             )
 
         # Barrel files in src/
-        if "/src/" in filepath and filepath.endswith(("index.ts", "index.tsx")):
+        if ("/src/" in filepath or filepath.startswith("src/")) and filepath.endswith(("index.ts", "index.tsx")):
             # Check if it's primarily re-exports
             export_from_count = len(re.findall(r"export\s+.*\s+from\s+", content))
             total_lines = content.count("\n")

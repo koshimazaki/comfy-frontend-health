@@ -35,10 +35,12 @@ TRIGGER_COMPONENTS = [
 
 # HTML elements that have Reka UI replacements
 HTML_TO_REKA: dict[str, str] = {
-    "<dialog": "DialogRoot",
+    "<dialog>": "DialogRoot",
+    "<dialog ": "DialogRoot",
     "<select>": "SelectRoot",
     "<select ": "SelectRoot",
-    "<details": "CollapsibleRoot",
+    "<details>": "CollapsibleRoot",
+    "<details ": "CollapsibleRoot",
 }
 
 # Reka UI root components that should use useForwardPropsEmits
@@ -104,7 +106,7 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
 
         # ── Direct HTML where Reka UI exists ──────────────────────────
         for html_elem, reka_comp in HTML_TO_REKA.items():
-            if html_elem in content and "/src/" in filepath:
+            if html_elem in content and ("/src/" in filepath or filepath.startswith("src/")):
                 # Don't flag if the file already imports from reka-ui
                 # (might be using both intentionally during migration)
                 if not has_reka:

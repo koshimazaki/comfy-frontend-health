@@ -4,7 +4,6 @@ Finds:
 - Options API usage (should be Composition API with <script setup>)
 - withDefaults usage (should be Vue 3.5 props destructuring)
 - Runtime props declaration (should be type-only)
-- Missing defineModel for v-model bindings (separate prop + emit)
 - defineSlots usage (should use template-based slots)
 """
 

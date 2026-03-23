@@ -68,8 +68,8 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                 }
             )
 
-        # !important prefix in tailwind
-        if re.search(r"['\"`]\s*!(?:bg-|text-|border-|p-|m-|w-|h-|flex|grid)", content):
+        # !important prefix in tailwind (matches ! anywhere in class string)
+        if re.search(r"(?<=['\"`\s])!(?:bg-|text-|border-|p-|m-|w-|h-|flex|grid)", content):
             issues.append(
                 {
                     "file": filepath,
@@ -77,7 +77,7 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                     "summary": "Uses ! important prefix — find and fix conflicting classes instead",
                     "line": _find_line(
                         content,
-                        r"['\"`]\s*!(?:bg-|text-|border-|p-|m-|w-|h-|flex|grid)",
+                        r"(?<=['\"`\s])!(?:bg-|text-|border-|p-|m-|w-|h-|flex|grid)",
                     ),
                 }
             )
@@ -97,11 +97,11 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                 break  # One per file
 
         # <style> blocks in Vue SFCs
-        if is_vue and re.search(r"<style[\s>]", content):
-            # Allow exception for :deep() selectors with comment
+        if is_vue:
             style_match = re.search(r"<style[\s>]", content)
             if style_match:
-                style_section = content[style_match.start() :]
+                style_end = content.find("</style>", style_match.start())
+                style_section = content[style_match.start():style_end] if style_end != -1 else content[style_match.start():]
                 if ":deep(" not in style_section:
                     issues.append(
                         {

@@ -34,7 +34,7 @@ def detect_conventions(path: Path) -> tuple[list[dict], int]:
 
         is_vue = filepath.endswith(".vue")
         is_test = ".test." in filepath or ".spec." in filepath
-        in_src = "/src/" in filepath
+        in_src = ("/src/" in filepath or filepath.startswith("src/"))
 
         # ── @ts-expect-error / @ts-ignore ─────────────────────────────
         if in_src and not is_test:
