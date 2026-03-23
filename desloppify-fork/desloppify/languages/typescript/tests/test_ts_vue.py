@@ -285,6 +285,21 @@ export function doStuff(x: any): any {
         issues, _ = detect_component_violations(tmp_path)
         assert "ts_any_type" in _detectors_for(issues)
 
+    def test_as_any_only_does_not_trigger_bare_any(self, tmp_path: Path):
+        """When code has only 'as any' (no bare ': any'), ts_any_type should not fire."""
+        _write_fixture(
+            tmp_path,
+            "src/utils/cast.ts",
+            """\
+export function cast(x: unknown) {
+  return x as any
+}
+""",
+        )
+        issues, _ = detect_component_violations(tmp_path)
+        assert "ts_as_any" in _detectors_for(issues)
+        assert "ts_any_type" not in _detectors_for(issues)
+
     def test_detects_mixed_import_type(self, tmp_path: Path):
         _write_fixture(
             tmp_path,

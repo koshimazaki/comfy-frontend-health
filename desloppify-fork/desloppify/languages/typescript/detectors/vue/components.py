@@ -65,16 +65,18 @@ def detect_component_violations(path: Path) -> tuple[list[dict], int]:
                 }
             )
 
-        # Bare any type (: any, <any>, = any)
-        any_matches = re.findall(r"(?::|\<|=)\s*any\b", content)
-        if any_matches:
+        # Bare any type (: any, <any>, = any) — excluding 'as any' to avoid double-count
+        all_any_matches = len(re.findall(r"(?::|\<|=)\s*any\b", content))
+        as_any_count = len(re.findall(r"\bas\s+any\b", content))
+        bare_only_count = all_any_matches - as_any_count
+        if bare_only_count > 0:
             issues.append(
                 {
                     "file": filepath,
                     "detector": "ts_any_type",
-                    "summary": f"Uses 'any' type ({len(any_matches)}x) — use proper TypeScript types",
+                    "summary": f"Uses 'any' type ({bare_only_count}x) — use proper TypeScript types",
                     "line": _find_line(content, r":\s*any\b"),
-                    "count": len(any_matches),
+                    "count": bare_only_count,
                 }
             )
 
