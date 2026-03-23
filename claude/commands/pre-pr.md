@@ -82,6 +82,27 @@ for f in $CHANGED_SRC; do
 done
 ```
 
+Completeness warnings (non-blocking):
+
+```bash
+# New composables with no unit test
+echo "$CHANGED_SRC" | grep -E 'use[A-Z].*\.ts$' | while read f; do
+  test_file="${f%.ts}.test.ts"
+  [ ! -f "$test_file" ] && echo "⚠ No unit test for composable: $f"
+done
+
+# New components/routes with no E2E spec
+echo "$CHANGED_SRC" | grep -E '\.vue$' | while read f; do
+  base=$(basename "$f" .vue)
+  find browser_tests -name "*${base}*spec.ts" 2>/dev/null | grep -q . || echo "⚠ No E2E spec: $f"
+done
+
+# E2E tests not using ComfyPage fixtures
+echo "$CHANGED_SRC" | grep -E '\.spec\.ts$' | while read f; do
+  grep -q 'ComfyPage' "$f" || echo "⚠ Spec missing ComfyPage fixture: $f"
+done
+```
+
 ## Stage 3: Code Review (only with `--review`)
 
 ```

@@ -85,3 +85,6 @@ For full Reka UI patterns: load skill `shadcn-vue-reka`.
 - Use Skeleton during loading, never blank areas
 - Every interactive element needs keyboard accessibility
 - Icon-only buttons require a Tooltip
+- Async data fetching needs loading, error, and empty states (no blank screens)
+- Lists must handle the empty case with a meaningful "nothing here yet" message
+- Props passed through 3+ layers unchanged → extract to composable/store/provide-inject

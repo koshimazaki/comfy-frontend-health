@@ -73,6 +73,16 @@ Suggested next tests (TDD approach):
      RED:  it('returns updated value when input changes')
 ```
 
+## Completeness Signals
+
+These automatically influence scoring:
+
+- File fetches data but has no loading/error/empty states → score toward 3-4 (Partial/Weak)
+- Composable (`useXyz.ts`) with no `.test.ts` → auto-score 5 (Unprotected)
+- Component/route with no `.spec.ts` → flag as "⚠ No E2E" in report
+- List component with no empty state handling → note as gap
+- E2E test that builds workflows programmatically instead of using JSON fixtures → note as Weak
+
 ## Rules
 
 - Behavior = what the public interface does given inputs

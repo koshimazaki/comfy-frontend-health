@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# comfy-health — friendly CLI wrapper for desloppify
+# Maps user-friendly subcommands to desloppify internals.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_PATH="${COMFY_FRONTEND_PATH:-.}"
+
+usage() {
+  cat <<'EOF'
+comfy-health — ComfyUI frontend health checker
+
+Usage:
+  comfy-health scan [options]         Run all detectors, update state, show diff
+  comfy-health check [options]        Run subjective review (assess code quality dimensions)
+  comfy-health status                 Full project dashboard: score, dimensions, progress
+  comfy-health show <pattern>         Dig into issues by file, directory, detector, or ID
+  comfy-health next                   Show next priority item from the living plan
+  comfy-health backlog                Show broader backlog items
+  comfy-health plan                   View/update the living plan
+  comfy-health tree                   Annotated codebase tree
+  comfy-health viz                    Generate interactive HTML treemap
+  comfy-health diff [REF]             Scan only files changed since REF (default: HEAD~1)
+  comfy-health branch [BASE]          Scan files changed vs BASE branch (default: main)
+  comfy-health doctor                 Self-check: verify deps, config, project setup
+
+Options (scan):
+  --skip-slow                         Skip slow detectors (duplicates)
+  --no-badge                          Skip scorecard image generation
+  --profile {objective,full,ci}       Scan profile
+
+Options (check):
+  --prepare                           Generate review packet for subjective dimensions
+  --import FILE                       Import completed review
+
+Pass-through:
+  Any unrecognized subcommand or flag is forwarded directly to desloppify.
+
+Environment:
+  COMFY_FRONTEND_PATH                 Project root (default: current directory)
+
+Examples:
+  comfy-health scan                   Full repo scan
+  comfy-health scan --skip-slow       Skip duplicate detection
+  comfy-health check                  Assess subjective quality dimensions
+  comfy-health show styling           Show all styling issues
+  comfy-health show src/stores/       Show issues in a directory
+  comfy-health diff                   Issues in files changed since HEAD~1
+  comfy-health diff HEAD~5            Issues in files changed in last 5 commits
+  comfy-health branch                 Issues in files changed vs main
+  comfy-health branch develop         Issues in files changed vs develop
+  comfy-health next                   Get next priority fix
+  comfy-health status                 Full dashboard
+  comfy-health doctor                 Check deps and project setup
+  comfy-health --version              Show version
+EOF
+}
+
+# Resolve the subcommand
+cmd="${1:-}"
+
+case "$cmd" in
+  -h|--help|help|"")
+    usage
+    exit 0
+    ;;
+  -v|--version|version)
+    ver=$(git -C "$SCRIPT_DIR" describe --tags 2>/dev/null || git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo "dev")
+    echo "comfy-health $ver"
+    exit 0
+    ;;
+  check)
+    shift
+    # "check" maps to "review --prepare" by default
+    # If user passes --import, forward as-is
+    # If user already passed --import or --prepare, forward as-is; else default to --prepare
+    has_explicit=false
+    for arg in "$@"; do
+      [[ "$arg" == "--import" || "$arg" == "--prepare" ]] && has_explicit=true
+    done
+    if $has_explicit; then
+      exec python -m desloppify review --path "$PROJECT_PATH" "$@"
+    else
+      exec python -m desloppify review --prepare --path "$PROJECT_PATH" "$@"
+    fi
+    ;;
+  # Diff: show known issues for files changed since a ref (default HEAD~1)
+  diff)
+    shift
+    strict=false
+    ref="HEAD~1"
+    for arg in "$@"; do
+      if [[ "$arg" == "--strict" ]]; then
+        strict=true
+      elif [[ "$arg" != -* && "$ref" == "HEAD~1" ]]; then
+        ref="$arg"
+      fi
+    done
+    files=$(cd "$PROJECT_PATH" && git diff --name-only "$ref" -- '*.vue' '*.ts' 2>/dev/null)
+    if [[ -z "$files" ]]; then
+      echo "No changed files since $ref"
+      exit 0
+    fi
+    echo "Files changed since $ref:"
+    echo "$files" | sed 's/^/  /'
+    echo ""
+    output=""
+    while IFS= read -r f; do
+      result=$(python -m desloppify show "$f" --no-budget 2>/dev/null || true)
+      [[ -n "$result" ]] && output+="$result"$'\n'
+      echo "$result"
+    done <<< "$files"
+    if $strict && [[ -n "$(echo "$output" | grep -v '^$')" ]]; then
+      exit 1
+    fi
+    ;;
+  # Branch: show known issues for files changed vs a base branch (default main)
+  branch)
+    shift
+    strict=false
+    base="main"
+    for arg in "$@"; do
+      if [[ "$arg" == "--strict" ]]; then
+        strict=true
+      elif [[ "$arg" != -* && "$base" == "main" ]]; then
+        base="$arg"
+      fi
+    done
+    merge_base=$(cd "$PROJECT_PATH" && git merge-base "$base" HEAD 2>/dev/null || echo "$base")
+    files=$(cd "$PROJECT_PATH" && git diff --name-only "$merge_base" -- '*.vue' '*.ts' 2>/dev/null)
+    if [[ -z "$files" ]]; then
+      echo "No changed files vs $base"
+      exit 0
+    fi
+    echo "Files changed vs $base (merge-base: ${merge_base:0:8}):"
+    echo "$files" | sed 's/^/  /'
+    echo ""
+    output=""
+    while IFS= read -r f; do
+      result=$(python -m desloppify show "$f" --no-budget 2>/dev/null || true)
+      [[ -n "$result" ]] && output+="$result"$'\n'
+      echo "$result"
+    done <<< "$files"
+    if $strict && [[ -n "$(echo "$output" | grep -v '^$')" ]]; then
+      exit 1
+    fi
+    ;;
+  # Self-check: verify deps, config, project setup
+  doctor)
+    errors=0
+
+    # Python version
+    if py_ver=$(python3 --version 2>/dev/null | awk '{print $2}'); then
+      py_major=$(echo "$py_ver" | cut -d. -f1)
+      py_minor=$(echo "$py_ver" | cut -d. -f2)
+      if [[ "$py_major" -ge 3 && "$py_minor" -ge 11 ]]; then
+        echo "✓ Python $py_ver"
+      else
+        echo "✗ Python $py_ver (need 3.11+)"
+        errors=$((errors + 1))
+      fi
+    else
+      echo "✗ Python 3 not found"
+      errors=$((errors + 1))
+    fi
+
+    # desloppify importable
+    if ds_ver=$(python3 -c "import desloppify; print(desloppify.__version__)" 2>/dev/null); then
+      echo "✓ desloppify $ds_ver"
+    elif python3 -c "import desloppify" 2>/dev/null; then
+      echo "✓ desloppify (version unknown)"
+    else
+      echo "✗ desloppify not importable (pip install desloppify)"
+      errors=$((errors + 1))
+    fi
+
+    # Project path and frontend files
+    proj=$(cd "$PROJECT_PATH" 2>/dev/null && pwd)
+    if [[ -d "$proj" ]]; then
+      vue_count=$(find "$proj" -name '*.vue' 2>/dev/null | wc -l | tr -d ' ')
+      ts_count=$(find "$proj" -name '*.ts' 2>/dev/null | wc -l | tr -d ' ')
+      if [[ "$vue_count" -gt 0 || "$ts_count" -gt 0 ]]; then
+        echo "✓ Project: $proj ($vue_count .vue, $ts_count .ts files)"
+      else
+        echo "✗ Project: $proj (no .vue or .ts files found)"
+        errors=$((errors + 1))
+      fi
+    else
+      echo "✗ Project path not found: $PROJECT_PATH"
+      errors=$((errors + 1))
+    fi
+
+    # .desloppify state directory
+    if [[ -d "$proj/.desloppify" ]]; then
+      echo "✓ State: $proj/.desloppify"
+    else
+      echo "⚠ No .desloppify/ state — run 'comfy-health scan' first"
+    fi
+
+    # Git
+    if command -v git &>/dev/null; then
+      if git -C "$proj" rev-parse --is-inside-work-tree &>/dev/null; then
+        git_branch=$(git -C "$proj" symbolic-ref --short HEAD 2>/dev/null || echo "detached")
+        if git -C "$proj" diff --quiet 2>/dev/null && git -C "$proj" diff --cached --quiet 2>/dev/null; then
+          echo "✓ Git: $git_branch branch, clean"
+        else
+          echo "✓ Git: $git_branch branch, dirty"
+        fi
+      else
+        echo "⚠ Not a git repository: $proj"
+      fi
+    else
+      echo "✗ Git not found"
+      errors=$((errors + 1))
+    fi
+
+    exit $errors
+    ;;
+  # Commands that accept --path
+  scan|tree|viz|detect|move|exclude)
+    shift
+    exec python -m desloppify "$cmd" --path "$PROJECT_PATH" "$@"
+    ;;
+  # Commands that use --state (no --path flag)
+  status|next|backlog|plan|show|autofix|suppress|review|zone)
+    shift
+    exec python -m desloppify "$cmd" "$@"
+    ;;
+  # Commands with no path/state args
+  config|langs|dev|update-skill)
+    shift
+    exec python -m desloppify "$cmd" "$@"
+    ;;
+  *)
+    # Pass-through for anything else
+    exec python -m desloppify "$@"
+    ;;
+esac

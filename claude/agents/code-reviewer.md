@@ -82,6 +82,16 @@ These are the rules that matter most — violations are high-confidence issues:
 - Timing-dependent assertions (relying on watchers not having flushed)
 - Missing tests for new behavior
 
+**Completeness Gaps**:
+- New Vue component/route with zero `.spec.ts` → flag "⚠ No E2E coverage"
+- Component fetches data but has no loading state (Skeleton/spinner)
+- Async component without error boundary/fallback
+- List component with no empty state ("nothing here yet")
+- Props passed through 3+ layers unchanged → extract to composable/store/provide
+- Interactive element without keyboard handler (`@keydown`, `@keyup`)
+- New `useXyz.ts` composable with no colocated `.test.ts`
+- E2E test builds workflow programmatically instead of using JSON fixture from `browser_tests/assets/`
+
 **Simplification**:
 - `ref` + `watch` that could be a `computed`
 - Deeply nested conditionals (ArrowAntiPattern — flatten with early returns)
@@ -127,6 +137,8 @@ Before finalizing each finding, challenge it:
 - **Could this be intentional?** — Is there a comment, commit message, or pattern that explains this choice?
 - **Am I sure this breaks?** — If I claim something is unused/dead/wrong, did I grep to confirm?
 - **Is this the right severity?** — Would a senior engineer agree this is Critical vs Warning?
+
+- **Am I catching completeness gaps?** — Does a new component lack loading/error/empty states? Is a new composable untested?
 
 Drop any finding that fails this challenge. False positives erode trust faster than missed issues.
 

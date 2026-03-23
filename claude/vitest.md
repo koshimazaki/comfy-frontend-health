@@ -27,6 +27,12 @@ See `docs/testing/*.md` for detailed patterns.
 - Follow advice about making components easy to test
 - Wait for reactivity with `await nextTick()` after state changes
 
+## Coverage Expectations
+
+- Every new composable (`useXyz.ts`) needs a colocated `.test.ts`
+- Every new store (`*Store.ts`) needs behavioral tests for public actions/getters
+- Components with async data fetching need tests for loading, error, and empty states
+
 ## Running Tests
 
 ```bash

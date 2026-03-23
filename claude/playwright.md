@@ -87,6 +87,12 @@ Tags are respected by config:
 - Check `browser_tests/assets/` for test data and fixtures
 - Use realistic ComfyUI workflows for E2E tests
 
+## Fixture Usage
+
+- Always use JSON workflow fixtures from `browser_tests/assets/` — never build workflows programmatically in test code
+- Use `ComfyPage` for page interactions; check existing tests for established patterns
+- New E2E tests for components/routes should load realistic fixtures, not construct state manually
+
 ## Running Tests
 
 ```bash
