@@ -42,7 +42,7 @@ from desloppify.languages.typescript.detectors.exports import cmd_exports
 from desloppify.languages.typescript.detectors.logs import cmd_logs
 from desloppify.languages.typescript.detectors.patterns.cli import cmd_patterns
 from desloppify.languages.typescript.detectors.props import cmd_props
-from desloppify.languages.typescript.detectors.react.cli import cmd_react
+from desloppify.languages.typescript.detectors.vue.cli import cmd_vue
 from desloppify.languages.typescript.detectors.unused import cmd_unused
 from desloppify.languages.typescript.extractors_components import (
     detect_passthrough_components,
@@ -314,7 +314,7 @@ def get_detect_commands() -> dict[str, Callable[..., None]]:
             "coupling": cmd_coupling,
             "patterns": cmd_patterns,
             "naming": cmd_naming,
-            "react": cmd_react,
+            "vue": cmd_vue,
             "facade": cmd_facade,
         },
     )
@@ -338,7 +338,7 @@ __all__ = [
     "cmd_passthrough",
     "cmd_patterns",
     "cmd_props",
-    "cmd_react",
+    "cmd_vue",
     "cmd_single_use",
     "cmd_smells",
     "cmd_unused",
