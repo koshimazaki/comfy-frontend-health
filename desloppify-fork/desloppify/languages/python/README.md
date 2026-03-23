@@ -32,7 +32,7 @@ Public package exports are intentionally narrow in
 - Add a `NODE_DETECTORS` or `TREE_DETECTORS` spec entry.
 - Ensure smell ID is unique.
 
-4. Wire smell metadata in `/Users/peteromalley/Documents/desloppify/desloppify/languages/python/detectors/smells.py`.
+4. Wire smell metadata in `desloppify/languages/python/detectors/smells.py`.
 - Add ID, label, severity to `SMELL_CHECKS`.
 
 5. Add tests.
