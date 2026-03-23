@@ -103,11 +103,39 @@ echo "$CHANGED_SRC" | grep -E '\.spec\.ts$' | while read f; do
 done
 ```
 
+## Stage 2b: Branch Health Delta
+
+Classify all changed files vs main:
+
+```bash
+# New files — all issues are yours
+NEW_FILES=$(git diff --name-only --diff-filter=A main -- 'src/**/*.ts' 'src/**/*.vue')
+
+# Modified files — check what existed on main
+MOD_FILES=$(git diff --name-only --diff-filter=M main -- 'src/**/*.ts' 'src/**/*.vue')
+```
+
+For each modified file with issues, verify against main:
+```bash
+# Does this issue exist on main? If yes → pre-existing, not blocking
+git show main:<file> | grep -n '<pattern>'
+```
+
+Report:
+```
+Branch Health Delta
+  New files: N (issues: X)
+  Modified files: M (branch-introduced: Y, pre-existing: Z)
+  Tests added: +A
+  Net: BETTER/NEUTRAL/WORSE than main
+```
+
 ## Stage 3: Code Review (only with `--review`)
 
 ```
 Run the code-reviewer agent against `git diff main...HEAD`
 Focus on: bugs, AGENTS.md violations, type safety, design system, test quality, simplification
+Agent MUST classify findings as INTRODUCED vs PRE-EXISTING (see code-reviewer agent spec)
 ```
 
 ## Stage 4: Build Impact (only with `--full`)
@@ -137,5 +165,11 @@ Stage 2: Validation
   i18n       ✓ valid
   untested   ⚠ src/composables/useFoo.ts (no test file)
 
-Result: READY TO PUSH (3 warnings)
+Branch Health Delta
+  New files: 4 (issues: 3)
+  Modified: 8 (branch-introduced: 2, pre-existing: 12)
+  Tests: +2 added, 1 composable still untested
+  Net: BETTER (added tests, reduced debt in 2 files)
+
+Result: READY TO PUSH (5 branch-introduced warnings, 12 pre-existing noted)
 ```
