@@ -44,7 +44,44 @@ Prefer Vue native options when available:
   `:deep()` selectors are allowed. Add a brief inline comment explaining why the
   exception is required.
 
+## Component System: Reka UI + shadcn-vue
+
+Before creating or modifying UI components, check:
+
+1. **Does a component already exist?** Check `src/components/ui/` inventory
+2. **Can you compose from existing components?** Don't reinvent
+3. **Building new?** Use Reka UI primitives + semantic tokens + CVA variants
+
+### Key Patterns
+
+- Use `as-child` on Reka UI trigger components to avoid wrapper divs
+- Root wrappers: `useForwardPropsEmits` from reka-ui
+- Leaf wrappers: `useForwardProps` from reka-ui
+- Style Reka UI states via `data-[state=...]` Tailwind selectors
+- Define variants in colocated `*.variants.ts` using CVA
+- Never use native `<dialog>`, `<select>`, `<details>` — use Reka UI primitives
+- Never use PrimeVue for new components
+- Never import both PrimeVue and reka-ui in the same file (incomplete migration)
+
+### Semantic Tokens (never raw colors)
+
+```
+bg-base-background          (not bg-white / bg-gray-900)
+text-base-foreground         (not text-black)
+bg-primary-background        (not bg-blue-500)
+bg-secondary-background      (not bg-gray-100)
+bg-destructive-background    (not bg-red-500)
+border-default               (not border-gray-200)
+text-muted-foreground        (not text-gray-500)
+```
+
+For full design system details: load skill `design-system`.
+For full Reka UI patterns: load skill `shadcn-vue-reka`.
+
 ## Best Practices
 
 - Extract complex conditionals to `computed`
 - In unmounted hooks, implement cleanup for async operations
+- Use Skeleton during loading, never blank areas
+- Every interactive element needs keyboard accessibility
+- Icon-only buttons require a Tooltip

@@ -195,10 +195,18 @@ Every review (full or focused) applies these rules:
 - `vi.hoisted()` for per-test mock manipulation
 - Behavioral coverage, not line coverage
 
-### Components
+### Components & Design System
 - No new PrimeVue — use Reka UI primitives + shadcn-vue
-- CVA variants for component styling
-- Accessible interactive widgets (ARIA, keyboard nav)
+- Check `src/components/ui/` inventory before building new
+- CVA variants in colocated `*.variants.ts`, not inline in `.vue`
+- `as-child` on Reka UI trigger components (no wrapper divs)
+- `useForwardPropsEmits` on root wrappers, `useForwardProps` on leaves
+- `data-[state=...]` selectors for Reka UI states (not manual v-if/v-show)
+- Semantic tokens only — no raw Tailwind colors or hex values
+- Accessible interactive widgets (ARIA, keyboard nav, focus management)
+- New `ui/` components need colocated `.stories.ts`
+- Native `<dialog>`, `<select>`, `<details>` → use Reka UI primitives
+- Flag >14 props — decompose via composition pattern
 
 ## Quality Gates
 

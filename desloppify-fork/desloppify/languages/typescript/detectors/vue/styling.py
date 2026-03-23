@@ -112,6 +112,32 @@ def detect_styling_violations(path: Path) -> tuple[list[dict], int]:
                         }
                     )
 
+        # Raw Tailwind colors instead of semantic tokens (in template/script)
+        raw_color_match = re.search(
+            r"(?:bg|text|border|ring|outline|shadow|fill|stroke)-(?:red|blue|green|yellow|gray|slate|zinc|neutral|stone|orange|amber|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}",
+            content,
+        )
+        if raw_color_match:
+            issues.append(
+                {
+                    "file": filepath,
+                    "detector": "tailwind_raw_color",
+                    "summary": "Uses raw Tailwind color class — use semantic tokens (bg-primary-background, text-muted-foreground, etc.)",
+                    "line": content[: raw_color_match.start()].count("\n") + 1,
+                }
+            )
+
+        # Hardcoded hex/rgb in class strings or inline styles
+        if is_vue and re.search(r'(?:class|style)=["\'][^"\']*#[0-9a-fA-F]{3,8}', content):
+            issues.append(
+                {
+                    "file": filepath,
+                    "detector": "hardcoded_color_value",
+                    "summary": "Uses hardcoded hex color in class/style — use semantic tokens from style.css",
+                    "line": _find_line(content, r'(?:class|style)=["\'][^"\']*#[0-9a-fA-F]{3,8}'),
+                }
+            )
+
     return issues, total_files
 
 

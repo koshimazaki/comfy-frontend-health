@@ -65,6 +65,12 @@ _DETECTOR_CONFIG: dict[str, tuple[int, str]] = {
     "reka_use_primitive": (3, "low"),
     "reka_missing_forward_props": (3, "medium"),
     "reka_primevue_dual_import": (3, "high"),
+    "cva_inline_in_component": (3, "medium"),
+    "missing_story": (3, "low"),
+    "reka_manual_state_toggle": (3, "medium"),
+    # Styling — design system
+    "tailwind_raw_color": (2, "high"),
+    "hardcoded_color_value": (2, "high"),
 }
 
 

@@ -163,6 +163,54 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
                 }
             )
 
+        # ── CVA variant inlined in component (should be in .variants.ts) ─
+        if has_reka or "cva" in content:
+            # cva() call inside a .vue file instead of colocated .variants.ts
+            if re.search(r"\bcva\s*\(\s*\{", content):
+                issues.append(
+                    {
+                        "file": filepath,
+                        "detector": "cva_inline_in_component",
+                        "summary": "CVA variants defined inline — extract to colocated .variants.ts file",
+                        "line": _find_line(content, r"\bcva\s*\(\s*\{"),
+                    }
+                )
+
+        # ── Missing Storybook story for ui/ component ─────────────────
+        if "/components/ui/" in filepath and filepath.endswith(".vue"):
+            story_path = filepath.replace(".vue", ".stories.ts")
+            if not Path(story_path).exists():
+                issues.append(
+                    {
+                        "file": filepath,
+                        "detector": "missing_story",
+                        "summary": "UI component missing colocated .stories.ts file",
+                        "line": 1,
+                    }
+                )
+
+        # ── Manual v-if/v-show for open state on Reka UI components ──
+        if has_reka:
+            # Using v-if/v-show on Reka Content/Overlay instead of
+            # letting Reka UI manage open state via data-[state=open]
+            manual_toggle = re.search(
+                r'v-(?:if|show)=["\'][^"\']*(?:open|visible|show)',
+                content,
+            )
+            if manual_toggle:
+                # Only flag if a Reka Root is present (likely managing its own state)
+                for root in REKA_ROOTS:
+                    if root in content:
+                        issues.append(
+                            {
+                                "file": filepath,
+                                "detector": "reka_manual_state_toggle",
+                                "summary": "Uses v-if/v-show for open state — let Reka UI manage via data-[state=open]",
+                                "line": content[: manual_toggle.start()].count("\n") + 1,
+                            }
+                        )
+                        break
+
     return issues, total_files
 
 

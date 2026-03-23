@@ -248,6 +248,7 @@ src/components/ui/<component>/
 - **Never use `npx`** — use `pnpm dlx` or `pnpx`
 - **Never use `dark:` variant** — use semantic theme tokens
 - **Never use `:class="[]"`** — use `cn()` from `@/utils/tailwindUtil`
+- **Never use raw Tailwind colors** (`bg-blue-500`, `text-gray-700`) — use semantic tokens
 - Use `as-child` on Reka UI triggers to avoid wrapper divs
 - Use `useForwardPropsEmits` for root wrappers, `useForwardProps` for leaves
 - Prefer `defineModel` over separate prop + emit for v-model bindings
@@ -255,6 +256,11 @@ src/components/ui/<component>/
 - Flag components with >14 props — likely needs decomposition or composition pattern
 - Never use native `<dialog>`, `<select>`, `<details>` — use Reka UI primitives
 - Never import both PrimeVue and reka-ui in the same component (incomplete migration)
+- CVA variants must be in colocated `*.variants.ts` files, not inline in `.vue`
+- Style Reka UI open/closed states via `data-[state=...]` — never manual `v-if`/`v-show` for state managed by Reka
+- New `ui/` components require a colocated `.stories.ts` file
+- Use `Skeleton` component during loading — never blank/empty areas
+- Icon-only buttons require a `Tooltip` for accessibility
 
 ## References
 

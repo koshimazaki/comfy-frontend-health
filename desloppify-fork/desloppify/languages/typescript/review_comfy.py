@@ -34,6 +34,12 @@ COMFY_HOLISTIC_REVIEW_DIMENSIONS: list[str] = [
     "type_safety",
     "logic_clarity",
     "dependency_health",
+    # Behavioral dimensions — "would a test catch a production break?"
+    "behavioral_coverage",
+    "regression_safety",
+    "test_confidence",
+    # Simplification — "is there a smarter way?"
+    "implementation_simplicity",
 ]
 
 # ── Review guidance ─────────────────────────────────────────────────────
@@ -91,17 +97,54 @@ COMFY_REVIEW_GUIDANCE = {
         "Check for hardcoded pluralization (should use i18n plurals system)",
     ],
     "design_system": [
-        "Check component usage against Reka UI primitives + shadcn-vue patterns",
-        "Verify CVA variants for component styling",
-        "Check accessible interactive widgets (ARIA, keyboard nav)",
-        "Verify semantic color tokens (not raw hex/rgb values)",
-        "Check spacing consistency with design system scale",
+        "Check if a component in src/components/ui/ already exists for this need (see inventory)",
+        "Verify CVA variants are in colocated .variants.ts files, not inline in .vue",
+        "Check Reka UI triggers use as-child to avoid wrapper div bloat",
+        "Verify useForwardPropsEmits on root wrappers, useForwardProps on leaves",
+        "Check data-[state=...] attribute styling instead of manual v-if/v-show toggles",
+        "Verify semantic color tokens (not raw hex/rgb or Tailwind color-NNN)",
+        "Check spacing consistency with design system scale (gap-1/2 tight, gap-3/4 sections)",
+        "Verify accessible interactive widgets (ARIA roles, keyboard nav, focus management)",
+        "Check new ui/ components have colocated .stories.ts files",
+        "Flag native <dialog>, <select>, <details> — use Reka UI primitives",
+        "Flag components with >14 props — needs decomposition or composition pattern",
     ],
     "naming": (
         "TypeScript uses camelCase for functions/variables, PascalCase for "
         "types/components/Vue files. Composables: useXyz.ts. Stores: *Store.ts. "
         "Check for inconsistency within modules."
     ),
+    "behavioral_coverage": [
+        "For each changed function: if this broke in production, would any test catch it?",
+        "Check tests assert on observable behavior, not implementation details",
+        "Flag code paths with user-visible impact that have zero test coverage",
+        "Verify error states and edge cases are tested, not just happy paths",
+        "Check that API contract changes have corresponding test updates",
+    ],
+    "regression_safety": [
+        "If a recent commit introduced a subtle bug, would the test suite catch it?",
+        "Check for tests that passed before AND after a behavioral change (false green)",
+        "Flag refactored code where tests were updated to match new behavior without verifying correctness",
+        "Verify critical user flows have end-to-end coverage (not just unit tests)",
+        "Check that bug fixes include a regression test proving the fix",
+    ],
+    "test_confidence": [
+        "Can you trust this test suite enough to refactor fearlessly?",
+        "Flag tests with assertions that cannot fail (always-true, tautological)",
+        "Check for over-mocking that decouples tests from real behavior",
+        "Verify tests would break if the feature stopped working entirely",
+        "Flag tests that pass on wrong output (weak assertions, partial matching)",
+    ],
+    "implementation_simplicity": [
+        "Is there a simpler way to achieve the same result with fewer moving parts?",
+        "Flag ref+watch patterns that could be a single computed",
+        "Flag unnecessary abstractions — would inlining be clearer?",
+        "Check for over-engineered generics when a concrete type suffices",
+        "Flag multi-step transformations that could be a single expression",
+        "Check if existing VueUse composables or es-toolkit functions replace custom code",
+        "Flag deeply nested logic — can early returns flatten it?",
+        "Ask: would a new team member understand this in under 30 seconds?",
+    ],
 }
 
 # ── Migration pairs (Vue-specific) ─────────────────────────────────────

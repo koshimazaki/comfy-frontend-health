@@ -47,6 +47,10 @@ For each changed file, check for:
 6. `@ts-expect-error` / `@ts-ignore` — fix the underlying type issue
 7. `waitForTimeout` in `.spec.ts` files — use locator actions
 8. `withDefaults(` in `.vue` files — use props destructuring
+9. `bg-red-` / `bg-blue-` / `text-gray-` etc — use semantic tokens
+10. `from 'primevue/` — use Reka UI + shadcn-vue
+11. `<dialog` / `<select>` / `<details>` in `.vue` — use Reka UI primitives
+12. `cva({` inside `.vue` files — extract to colocated `.variants.ts`
 
 Report findings grouped by file with line numbers. These are warnings, not blockers — but flag them clearly.
 

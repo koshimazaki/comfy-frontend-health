@@ -44,6 +44,17 @@ These are the rules that matter most — violations are high-confidence issues:
 - No barrel files (`index.ts` re-exports) within `src/`
 - No PrimeVue for new components — use Reka UI primitives + shadcn-vue
 
+**Design System (Reka UI + shadcn-vue)**:
+- Check `src/components/ui/` inventory before creating new components
+- Reka UI triggers must use `as-child` (no wrapper div bloat)
+- Root wrappers: `useForwardPropsEmits`; leaf wrappers: `useForwardProps`
+- CVA variants in colocated `*.variants.ts` files, not inline in `.vue`
+- Style Reka UI states via `data-[state=...]` selectors, not manual v-if/v-show
+- Semantic color tokens only — never raw Tailwind colors (`bg-blue-500`) or hex values
+- New `ui/` components need colocated `.stories.ts`
+- Native `<dialog>`, `<select>`, `<details>` → use Reka UI primitives
+- Components with >14 props → decompose or use composition pattern
+
 **Testing**:
 - No change-detector tests (asserting defaults haven't changed)
 - No tests that just test mocks
@@ -108,6 +119,16 @@ One-line summary of scope reviewed, then for each issue:
 - **Fix**: concrete suggestion
 
 Group by priority. End with a brief verdict. If clean, say so.
+
+## Reflect (self-challenge before reporting)
+
+Before finalizing each finding, challenge it:
+- **Did I verify?** — Did I read the actual code, or am I guessing from the diff?
+- **Could this be intentional?** — Is there a comment, commit message, or pattern that explains this choice?
+- **Am I sure this breaks?** — If I claim something is unused/dead/wrong, did I grep to confirm?
+- **Is this the right severity?** — Would a senior engineer agree this is Critical vs Warning?
+
+Drop any finding that fails this challenge. False positives erode trust faster than missed issues.
 
 ## Rules
 
