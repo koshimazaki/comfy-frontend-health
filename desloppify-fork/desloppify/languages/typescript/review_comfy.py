@@ -131,15 +131,6 @@ COMFY_MIGRATION_PATTERN_PAIRS = [
     ("require → import", re.compile(r"\brequire\("), re.compile(r"\bimport\s+")),
 ]
 
-# ── Boundary rules ──────────────────────────────────────────────────────
-# Layered architecture enforcement for desloppify boundary detector.
 
-COMFY_BOUNDARY_RULES = [
-    # (source_pattern, forbidden_target_pattern, label)
-    ("base/", "platform/", "base→platform"),
-    ("base/", "workbench/", "base→workbench"),
-    ("base/", "renderer/", "base→renderer"),
-    ("platform/", "workbench/", "platform→workbench"),
-    ("platform/", "renderer/", "platform→renderer"),
-    ("workbench/", "renderer/", "workbench→renderer"),
-]
+# Note: Boundary rules are defined directly in __init__.py TypeScriptConfig
+# as BoundaryRule instances, not as tuples here.

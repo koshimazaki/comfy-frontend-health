@@ -43,4 +43,5 @@ __all__ = [
     "detect_layer_violations",
     "detect_reka_patterns",
     "detect_styling_violations",
+    "iter_vue_and_ts_sources",
 ]
