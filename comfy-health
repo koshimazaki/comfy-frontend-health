@@ -100,6 +100,7 @@ case "$cmd" in
     fi
     ;;
   # Diff: show known issues for files changed since a ref (default HEAD~1)
+  # Separates new files (all issues are yours) from modified files (may be pre-existing)
   diff)
     shift
     strict=false
@@ -116,22 +117,76 @@ case "$cmd" in
       echo "No changed files since $ref"
       exit 0
     fi
-    echo "Files changed since $ref:"
-    echo "$files" | sed 's/^/  /'
-    echo ""
-    output=""
-    while IFS= read -r f; do
-      result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
-      [[ -n "$result" ]] && output+="$result"$'\n'
-      echo "$result"
-    done <<< "$files"
-    issue_count=$(echo "$output" | grep -c -v '^$' || true)
-    log_run "diff" "$issue_count" "ref:$ref"
-    if $strict && [[ -n "$(echo "$output" | grep -v '^$')" ]]; then
+
+    # Classify files as new (added) or modified
+    new_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=A "$ref" -- '*.vue' '*.ts' 2>/dev/null)
+    mod_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=M "$ref" -- '*.vue' '*.ts' 2>/dev/null)
+
+    new_output=""
+    mod_output=""
+    new_count=0
+    mod_count=0
+
+    # New files: all issues are branch-introduced
+    if [[ -n "$new_files" ]]; then
+      echo "── New files (all issues are yours) ──"
+      while IFS= read -r f; do
+        echo "  $f"
+        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
+        if [[ -n "$result" ]]; then
+          new_output+="$result"$'\n'
+          new_count=$((new_count + $(echo "$result" | grep -c -v '^$' || true)))
+          echo "$result"
+        fi
+      done <<< "$new_files"
+      echo ""
+    fi
+
+    # Modified files: get changed line numbers, filter issues
+    if [[ -n "$mod_files" ]]; then
+      echo "── Modified files (showing issues on changed lines only) ──"
+      while IFS= read -r f; do
+        # Extract changed line numbers from diff hunks (+side = new lines)
+        changed_lines=$(cd "$PROJECT_PATH" && git diff -U0 "$ref" -- "$f" 2>/dev/null | \
+          grep -oP '^\+\+\+ |^@@.*\+\K[0-9]+(,[0-9]+)?' | \
+          while IFS=, read -r start count; do
+            count=${count:-1}
+            for ((i=start; i<start+count; i++)); do echo "$i"; done
+          done)
+        echo "  $f ($(echo "$changed_lines" | wc -l | tr -d ' ') lines changed)"
+        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
+        if [[ -n "$result" && -n "$changed_lines" ]]; then
+          # Filter: only show lines that match changed line numbers
+          filtered=""
+          while IFS= read -r line; do
+            # Try to extract line number from issue output (common format: :NNN or line NNN)
+            line_num=$(echo "$line" | grep -oP '(?::|line\s+)\K[0-9]+' | head -1)
+            if [[ -z "$line_num" ]]; then
+              # No line number found — include it (header/summary line)
+              filtered+="$line"$'\n'
+            elif echo "$changed_lines" | grep -qx "$line_num"; then
+              filtered+="$line"$'\n'
+            fi
+          done <<< "$result"
+          if [[ -n "$filtered" ]]; then
+            mod_output+="$filtered"
+            mod_count=$((mod_count + $(echo "$filtered" | grep -c -v '^$' || true)))
+            echo "$filtered"
+          fi
+        fi
+      done <<< "$mod_files"
+      echo ""
+    fi
+
+    total=$((new_count + mod_count))
+    echo "Summary: $new_count issues in new files, $mod_count issues on changed lines in modified files ($total total)"
+    log_run "diff" "$total" "ref:$ref new:$new_count mod:$mod_count"
+    if $strict && [[ $total -gt 0 ]]; then
       exit 1
     fi
     ;;
   # Branch: show known issues for files changed vs a base branch (default main)
+  # Separates new files from modified files to avoid blaming pre-existing debt on the branch
   branch)
     shift
     strict=false
@@ -149,18 +204,71 @@ case "$cmd" in
       echo "No changed files vs $base"
       exit 0
     fi
-    echo "Files changed vs $base (merge-base: ${merge_base:0:8}):"
-    echo "$files" | sed 's/^/  /'
+    echo "Branch: $(cd "$PROJECT_PATH" && git symbolic-ref --short HEAD 2>/dev/null) vs $base (merge-base: ${merge_base:0:8})"
     echo ""
-    output=""
-    while IFS= read -r f; do
-      result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
-      [[ -n "$result" ]] && output+="$result"$'\n'
-      echo "$result"
-    done <<< "$files"
-    issue_count=$(echo "$output" | grep -c -v '^$' || true)
-    log_run "branch" "$issue_count" "base:$base"
-    if $strict && [[ -n "$(echo "$output" | grep -v '^$')" ]]; then
+
+    # Classify files as new (added) or modified
+    new_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=A "$merge_base" -- '*.vue' '*.ts' 2>/dev/null)
+    mod_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=M "$merge_base" -- '*.vue' '*.ts' 2>/dev/null)
+
+    new_output=""
+    mod_output=""
+    new_count=0
+    mod_count=0
+
+    # New files: all issues are branch-introduced
+    if [[ -n "$new_files" ]]; then
+      echo "── New files ($(echo "$new_files" | wc -l | tr -d ' ') files — all issues are branch-introduced) ──"
+      while IFS= read -r f; do
+        echo "  $f"
+        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
+        if [[ -n "$result" ]]; then
+          new_output+="$result"$'\n'
+          new_count=$((new_count + $(echo "$result" | grep -c -v '^$' || true)))
+          echo "$result"
+        fi
+      done <<< "$new_files"
+      echo ""
+    fi
+
+    # Modified files: only show issues on changed lines
+    if [[ -n "$mod_files" ]]; then
+      echo "── Modified files ($(echo "$mod_files" | wc -l | tr -d ' ') files — showing changed-line issues only) ──"
+      while IFS= read -r f; do
+        changed_lines=$(cd "$PROJECT_PATH" && git diff -U0 "$merge_base" -- "$f" 2>/dev/null | \
+          grep -oP '^\+\+\+ |^@@.*\+\K[0-9]+(,[0-9]+)?' | \
+          while IFS=, read -r start count; do
+            count=${count:-1}
+            for ((i=start; i<start+count; i++)); do echo "$i"; done
+          done)
+        echo "  $f ($(echo "$changed_lines" | wc -l | tr -d ' ') lines changed)"
+        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
+        if [[ -n "$result" && -n "$changed_lines" ]]; then
+          filtered=""
+          while IFS= read -r line; do
+            line_num=$(echo "$line" | grep -oP '(?::|line\s+)\K[0-9]+' | head -1)
+            if [[ -z "$line_num" ]]; then
+              filtered+="$line"$'\n'
+            elif echo "$changed_lines" | grep -qx "$line_num"; then
+              filtered+="$line"$'\n'
+            fi
+          done <<< "$result"
+          if [[ -n "$filtered" ]]; then
+            mod_output+="$filtered"
+            mod_count=$((mod_count + $(echo "$filtered" | grep -c -v '^$' || true)))
+            echo "$filtered"
+          fi
+        fi
+      done <<< "$mod_files"
+      echo ""
+    fi
+
+    total=$((new_count + mod_count))
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Branch-introduced issues: $total ($new_count in new files, $mod_count on changed lines)"
+    echo "Files: $(echo "$new_files" | grep -c -v '^$' || true) new, $(echo "$mod_files" | grep -c -v '^$' || true) modified"
+    log_run "branch" "$total" "base:$base new:$new_count mod:$mod_count"
+    if $strict && [[ $total -gt 0 ]]; then
       exit 1
     fi
     ;;
