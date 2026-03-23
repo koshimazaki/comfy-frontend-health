@@ -1,24 +1,20 @@
 ---
-description: Pre-PR quality gate — run locally before pushing. Catches issues early so CI doesn't have to.
+description: Pre-PR quality gate — run locally before pushing. Fast by default, deep on demand.
 ---
 
 # /pre-pr — Local Quality Gate
 
-Run all quality checks before opening a PR. Stops on first failure.
-
 **Flags:**
-- `--quick` — Skip code-reviewer agent (Phases 1-2 only)
-- `--full` — Include build + bundle size delta (Phase 4)
-- No flag — Phases 1-3 (default)
+- *(default)* — Stage 1 + 2 (~90s)
+- `--review` — Add code-reviewer agent (Stage 3)
+- `--full` — Add build + bundle size (Stage 4)
+- `--quick` — Stage 1 only (~30s)
 
-## Execution
+## Stage 1: Deterministic Checks
 
-### Phase 1: Mechanical Checks (~30s)
-
-Run these in parallel. All must pass before proceeding.
+Run in parallel. All must pass before proceeding.
 
 ```bash
-# Run all 4 in parallel
 pnpm format:check &
 pnpm lint &
 pnpm typecheck &
@@ -26,142 +22,99 @@ pnpm knip --cache &
 wait
 ```
 
-If any fail, stop and report which check failed with the first few lines of output.
-Do NOT proceed to Phase 2 if Phase 1 fails.
-
-### Phase 2: Convention Scan (~10s)
-
-Run targeted grep checks for patterns that ESLint/oxlint don't catch:
+Then grep changed files for convention violations ESLint doesn't catch:
 
 ```bash
-# Check changed files only (faster)
 CHANGED=$(git diff --name-only HEAD~1 -- '*.vue' '*.ts' | grep -v node_modules | grep -v '.test.' | grep -v '.spec.')
 ```
 
 For each changed file, check for:
-1. `:class="["` — should use `cn()` from `@/utils/tailwindUtil`
-2. `as any` — fix the underlying type issue
-3. `!important` or `!bg-` / `!text-` prefix — find conflicting classes instead
-4. `<style` blocks in `.vue` files (exception: `:deep()`)
-5. `z.any()` — use `z.unknown()` then narrow
-6. `@ts-expect-error` / `@ts-ignore` — fix the underlying type issue
-7. `waitForTimeout` in `.spec.ts` files — use locator actions
-8. `withDefaults(` in `.vue` files — use props destructuring
-9. `bg-red-` / `bg-blue-` / `text-gray-` etc — use semantic tokens
-10. `from 'primevue/` — use Reka UI + shadcn-vue
-11. `<dialog` / `<select>` / `<details>` in `.vue` — use Reka UI primitives
-12. `cva({` inside `.vue` files — extract to colocated `.variants.ts`
+1. `:class="["` → use `cn()`
+2. `as any` → fix the type
+3. `!important` or `!bg-` / `!text-` → fix conflicting classes
+4. `<style` in `.vue` (exception: `:deep()`)
+5. `z.any()` → use `z.unknown()`
+6. `@ts-expect-error` / `@ts-ignore` → fix the type
+7. `waitForTimeout` in `.spec.ts` → use locator actions
+8. `withDefaults(` → use props destructuring
+9. `bg-red-` / `text-gray-` etc → use semantic tokens
+10. `from 'primevue/` → use Reka UI
+11. `<dialog` / `<select>` / `<details>` in `.vue` → Reka UI primitives
+12. `cva({` inside `.vue` → extract to `.variants.ts`
 
-Report findings grouped by file with line numbers. These are warnings, not blockers — but flag them clearly.
+Stop here if Stage 1 fails. Convention issues are warnings, not blockers.
 
-### Phase 3: Targeted Tests (~60s)
+## Stage 2: Diff-Scoped Validation
 
-Run unit tests for changed files only:
+Run tests for changed files:
 
 ```bash
-# Find test files that correspond to changed source files
 CHANGED_SRC=$(git diff --name-only HEAD~1 -- 'src/**/*.ts' 'src/**/*.vue')
 TEST_FILES=""
 for f in $CHANGED_SRC; do
   test_file="${f%.ts}.test.ts"
   test_file2="${f%.vue}.test.ts"
-  if [ -f "$test_file" ]; then TEST_FILES="$TEST_FILES $test_file"; fi
-  if [ -f "$test_file2" ]; then TEST_FILES="$TEST_FILES $test_file2"; fi
+  [ -f "$test_file" ] && TEST_FILES="$TEST_FILES $test_file"
+  [ -f "$test_file2" ] && TEST_FILES="$TEST_FILES $test_file2"
 done
-
-if [ -n "$TEST_FILES" ]; then
-  pnpm test:unit -- $TEST_FILES
-fi
+[ -n "$TEST_FILES" ] && pnpm test:unit -- $TEST_FILES
 ```
 
-Also run layer audit if any files in `src/base/`, `src/platform/`, `src/workbench/`, or `src/renderer/` changed:
+Conditional checks (only when relevant files changed):
 
 ```bash
-LAYER_CHANGED=$(echo "$CHANGED_SRC" | grep -E 'src/(base|platform|workbench|renderer)/')
-if [ -n "$LAYER_CHANGED" ]; then
+# Layer audit — only if layered directories changed
+echo "$CHANGED_SRC" | grep -qE 'src/(base|platform|workbench|renderer)/' && \
   pnpm lint 2>&1 | grep 'import-x/no-restricted-paths' -B1 | head -50
-fi
+
+# i18n — only if .vue files changed
+git diff --name-only HEAD~1 -- '*.vue' | grep -q . && \
+  pnpm exec tsx scripts/check-unused-i18n-keys.ts 2>&1 | tail -10
 ```
 
-Check i18n if any `.vue` template files changed:
+Flag changed source files that have **no corresponding test** (warning, not blocker):
 
 ```bash
-VUE_CHANGED=$(git diff --name-only HEAD~1 -- '*.vue')
-if [ -n "$VUE_CHANGED" ]; then
-  pnpm exec tsx scripts/check-unused-i18n-keys.ts 2>&1 | tail -10
-fi
+for f in $CHANGED_SRC; do
+  test_file="${f%.ts}.test.ts"
+  test_file2="${f%.vue}.test.ts"
+  [ ! -f "$test_file" ] && [ ! -f "$test_file2" ] && echo "⚠ No test: $f"
+done
 ```
 
-### Phase 3b: Behavioral Health (skip with `--quick`)
-
-For each changed source file, verify its tests protect against regressions:
-
-1. Find the corresponding test file
-2. If no test exists → flag as "UNPROTECTED" (warning for utils, blocker for stores/composables)
-3. If test exists → quick read to check:
-   - Does it test behavior through public interface? (good)
-   - Does it only assert mock calls or default values? (weak — flag)
-   - Are error paths covered? (gap if missing)
-
-Rate each file 1-5 risk score. Report files scoring 4+.
-
-### Phase 3c: Code Review (skip with `--quick`)
-
-Invoke the code-reviewer agent on the diff:
+## Stage 3: Code Review (only with `--review`)
 
 ```
 Run the code-reviewer agent against `git diff main...HEAD`
-Focus on: AGENTS.md violations, type safety, styling rules, layer architecture, test quality
+Focus on: bugs, AGENTS.md violations, type safety, design system, test quality, simplification
 ```
 
-Report findings inline. This is the judgment-based review that catches what grep can't.
-
-### Phase 4: Impact Assessment (only with `--full`)
+## Stage 4: Build Impact (only with `--full`)
 
 ```bash
 pnpm build
-# If size scripts exist:
 pnpm size:collect 2>/dev/null
 pnpm size:report 2>/dev/null
 ```
 
-Report bundle size delta if available.
-
-## Output Format
+## Output
 
 ```
 /pre-pr Results
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Phase 1: Mechanical
+Stage 1: Checks
   format     ✓
   lint       ✓
   typecheck  ✓
   knip       ✓
+  convention ⚠ 2 warnings (src/Bad.vue:12 :class=[], src/x.ts:5 as any)
 
-Phase 2: Convention Scan (3 files checked)
-  ⚠ src/components/Bad.vue:12 — :class="[]" array syntax
-  ⚠ src/utils/helper.ts:5 — as any usage
-  ✓ No blockers
+Stage 2: Validation
+  tests      ✓ 12 passed (2 files)
+  layer      ✓ clean
+  i18n       ✓ valid
+  untested   ⚠ src/composables/useFoo.ts (no test file)
 
-Phase 3: Tests
-  ✓ 12 tests passed (2 files)
-  ✓ Layer audit clean
-  ✓ i18n keys valid
-
-Phase 3b: Behavioral Health
-  🟢 src/stores/settingStore.ts — protected (2/5)
-  🔴 src/composables/useFoo.ts — UNPROTECTED (5/5)
-  ⚠ src/components/Bar.vue — weak tests (4/5, mock-only)
-
-Phase 3c: Code Review
-  ⚠ 1 warning: ref+watch could be computed (src/composables/useFoo.ts:23)
-  ✓ No critical issues
-
-Result: READY TO PUSH (2 warnings)
-```
-
-If any phase fails critically:
-```
-Result: NOT READY — fix Phase 1 failures first
+Result: READY TO PUSH (3 warnings)
 ```

@@ -13,6 +13,7 @@ import re
 # The dimension list itself stays compatible with desloppify's scoring engine.
 
 COMFY_HOLISTIC_REVIEW_DIMENSIONS: list[str] = [
+    # Upstream-compatible dimensions (14):
     "cross_module_architecture",
     "convention_outlier",
     "error_consistency",
@@ -27,19 +28,13 @@ COMFY_HOLISTIC_REVIEW_DIMENSIONS: list[str] = [
     "low_level_elegance",
     "design_coherence",
     "initialization_coupling",
-    # Additional ComfyUI-specific dimensions:
+    # ComfyUI-specific dimensions (6):
     "naming_quality",
     "contract_coherence",
-    "test_strategy",
+    "test_strategy",       # covers behavioral coverage, regression safety, test confidence
     "type_safety",
-    "logic_clarity",
+    "logic_clarity",       # covers implementation simplicity
     "dependency_health",
-    # Behavioral dimensions — "would a test catch a production break?"
-    "behavioral_coverage",
-    "regression_safety",
-    "test_confidence",
-    # Simplification — "is there a smarter way?"
-    "implementation_simplicity",
 ]
 
 # ── Review guidance ─────────────────────────────────────────────────────
@@ -87,9 +82,13 @@ COMFY_REVIEW_GUIDANCE = {
         "Flag tests that only test mocks (assertions can't fail when code breaks)",
         "Check for 'don't mock what you don't own' violations",
         "Verify vi.hoisted() for per-test mock manipulation",
-        "Check behavioral coverage over line coverage",
         "Flag waitForTimeout in Playwright tests — use locator actions",
         "Verify test files are colocated with source (*.test.ts next to *.ts)",
+        # Behavioral quality (folded from behavioral_coverage/regression_safety/test_confidence):
+        "For each changed function: if this broke in production, would any test catch it?",
+        "Check tests assert on observable behavior, not implementation details",
+        "Flag tests with assertions that cannot fail (tautological, always-true)",
+        "Verify bug fixes include a regression test proving the fix",
     ],
     "i18n": [
         "Check vue-i18n usage for all user-facing strings in templates",
@@ -114,37 +113,6 @@ COMFY_REVIEW_GUIDANCE = {
         "types/components/Vue files. Composables: useXyz.ts. Stores: *Store.ts. "
         "Check for inconsistency within modules."
     ),
-    "behavioral_coverage": [
-        "For each changed function: if this broke in production, would any test catch it?",
-        "Check tests assert on observable behavior, not implementation details",
-        "Flag code paths with user-visible impact that have zero test coverage",
-        "Verify error states and edge cases are tested, not just happy paths",
-        "Check that API contract changes have corresponding test updates",
-    ],
-    "regression_safety": [
-        "If a recent commit introduced a subtle bug, would the test suite catch it?",
-        "Check for tests that passed before AND after a behavioral change (false green)",
-        "Flag refactored code where tests were updated to match new behavior without verifying correctness",
-        "Verify critical user flows have end-to-end coverage (not just unit tests)",
-        "Check that bug fixes include a regression test proving the fix",
-    ],
-    "test_confidence": [
-        "Can you trust this test suite enough to refactor fearlessly?",
-        "Flag tests with assertions that cannot fail (always-true, tautological)",
-        "Check for over-mocking that decouples tests from real behavior",
-        "Verify tests would break if the feature stopped working entirely",
-        "Flag tests that pass on wrong output (weak assertions, partial matching)",
-    ],
-    "implementation_simplicity": [
-        "Is there a simpler way to achieve the same result with fewer moving parts?",
-        "Flag ref+watch patterns that could be a single computed",
-        "Flag unnecessary abstractions — would inlining be clearer?",
-        "Check for over-engineered generics when a concrete type suffices",
-        "Flag multi-step transformations that could be a single expression",
-        "Check if existing VueUse composables or es-toolkit functions replace custom code",
-        "Flag deeply nested logic — can early returns flatten it?",
-        "Ask: would a new team member understand this in under 30 seconds?",
-    ],
 }
 
 # ── Migration pairs (Vue-specific) ─────────────────────────────────────

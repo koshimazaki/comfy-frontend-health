@@ -11,7 +11,7 @@ Fork of [desloppify](https://github.com/peteromallet/desloppify) tuned for Comfy
 | **Boundaries** | generic shared→tools | base→platform→workbench→renderer |
 | **Migrations** | class→functional, axios→fetch | Options→Composition, PrimeVue→Reka, withDefaults→destructuring, lodash→es-toolkit |
 | **Scoping** | full repo only | + `--pr`, `--diff`, `--staged`, `--files` (via /comfy-deslop) |
-| **Agent bundle** | none | 8 skills, 7 commands, 1 agent, AGENTS.md, guidance docs |
+| **Agent bundle** | none | 8 skills, 6 commands, 1 agent, AGENTS.md, guidance docs |
 
 ## Install
 
@@ -86,11 +86,10 @@ Copied from the ComfyUI frontend repo — these are the actual production agents
 - `product-design-guideline` — UX heuristics and design principles
 
 **Commands:**
-- `comfy-deslop` — The main scan command with flexible targeting
-- `comprehensive-pr-review` — Full PR review with all conventions
-- `pre-pr` — Local quality gate before pushing (mechanical + behavioral + review)
-- `behavioral-health` — Behavioral regression risk audit (TDD-philosophy)
-- `test-coverage-gaps` — Find components/stores missing meaningful tests
+- `pre-pr` — Local quality gate (fast default, `--review` for code review, `--full` for build)
+- `comfy-deslop` — Repo/folder/file health scan + tech debt planning
+- `comprehensive-pr-review` — Deep PR review with inline GitHub comments
+- `behavioral-health` — Test health audit (missing tests + weak test detection)
 - `add-missing-i18n` — Find and add missing vue-i18n translations
 - `verify-visually` — Visual verification of UI changes
 
