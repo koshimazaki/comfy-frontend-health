@@ -123,6 +123,7 @@ Wrapper around the desloppify engine with friendlier subcommands.
 | `comfy-health diff [REF]` | Show issues for files changed since REF (default: HEAD~1) |
 | `comfy-health branch [BASE]` | Show issues for files changed vs BASE (default: main) |
 | `comfy-health doctor` | Self-check: verify Python, desloppify, project, git |
+| `comfy-health lint-review` | Deterministic code review — 6 Vue detectors against diff (fallback for rate-limited code_review) |
 | `comfy-health --version` | Show version |
 
 Use `--strict` with `diff`/`branch` to exit non-zero when issues are found (CI gate).

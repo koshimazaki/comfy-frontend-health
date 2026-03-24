@@ -38,6 +38,7 @@ Usage:
   comfy-health diff [REF]             Scan only files changed since REF (default: HEAD~1)
   comfy-health branch [BASE]          Scan files changed vs BASE branch (default: main)
   comfy-health doctor                 Self-check: verify deps, config, project setup
+  comfy-health lint-review [--base=B] Deterministic code review (fallback for rate-limited code_review)
 
 Options (scan):
   --skip-slow                         Skip slow detectors (duplicates)
@@ -342,6 +343,149 @@ case "$cmd" in
     fi
 
     exit $errors
+    ;;
+  # Deterministic code review — runs all 6 Vue detectors against diff, formatted
+  # like the code-reviewer agent. Zero LLM dependency, no rate limits.
+  # Use as fallback when code_review tool hits rate limits.
+  lint-review)
+    shift
+    base="main"
+    ref=""
+    for arg in "$@"; do
+      if [[ "$arg" == --base=* ]]; then
+        base="${arg#--base=}"
+      elif [[ "$arg" != -* ]]; then
+        ref="$arg"
+      fi
+    done
+
+    # Determine file scope
+    if [[ -n "$ref" ]]; then
+      merge_base="$ref"
+    else
+      merge_base=$(cd "$PROJECT_PATH" && git merge-base "$base" HEAD 2>/dev/null || echo "$base")
+    fi
+
+    new_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=A "$merge_base" -- '*.vue' '*.ts' 2>/dev/null || true)
+    mod_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=M "$merge_base" -- '*.vue' '*.ts' 2>/dev/null || true)
+
+    if [[ -z "$new_files" ]]; then new_count=0; else new_count=$(echo "$new_files" | grep -c -v '^$' || echo 0); fi
+    if [[ -z "$mod_files" ]]; then mod_count=0; else mod_count=$(echo "$mod_files" | grep -c -v '^$' || echo 0); fi
+
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Deterministic Code Review (lint-review)"
+    echo "Scope: ${new_count} new files, ${mod_count} modified files vs ${base}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    # Create temp directory with only changed files for targeted scanning
+    tmpdir=$(mktemp -d)
+    trap "rm -rf $tmpdir" EXIT
+
+    all_files=$(echo -e "${new_files}\n${mod_files}" | grep -v '^$' | sort -u)
+
+    if [[ -z "$all_files" ]]; then
+      echo "No changed .vue/.ts files — nothing to review."
+      log_run "lint-review" "0" "base:$base no_changes"
+      exit 0
+    fi
+
+    # Copy changed files into temp dir preserving structure
+    while IFS= read -r f; do
+      if [[ -f "$PROJECT_PATH/$f" ]]; then
+        mkdir -p "$tmpdir/$(dirname "$f")"
+        cp "$PROJECT_PATH/$f" "$tmpdir/$f"
+      fi
+    done <<< "$all_files"
+
+    # Run all 6 detectors against temp dir (cd into it so paths are relative)
+    review_output=$(cd "$tmpdir" && python3 -c "
+import sys, json
+from pathlib import Path
+
+sys.path.insert(0, '$SCRIPT_DIR/desloppify-fork')
+from desloppify.languages.typescript.detectors.vue import (
+    detect_composition_api,
+    detect_component_violations,
+    detect_styling_violations,
+    detect_layer_violations,
+    detect_conventions,
+    detect_reka_patterns,
+)
+
+path = Path('.')
+all_issues = []
+for detect_fn in [
+    detect_composition_api,
+    detect_component_violations,
+    detect_styling_violations,
+    detect_layer_violations,
+    detect_conventions,
+    detect_reka_patterns,
+]:
+    issues, _ = detect_fn(path)
+    all_issues.extend(issues)
+
+print(json.dumps(all_issues))
+" 2>/dev/null)
+
+    if [[ -z "$review_output" || "$review_output" == "[]" ]]; then
+      echo "✓ All clean — no convention violations in changed files."
+      echo ""
+      echo "### Branch Health Delta"
+      echo "  New files: $new_count (issues: 0)"
+      echo "  Modified files: $mod_count (branch-introduced: 0)"
+      echo "  Net: CLEAN"
+      log_run "lint-review" "0" "base:$base clean"
+      exit 0
+    fi
+
+    # Parse and format like code-reviewer agent output
+    python3 -c "
+import json, sys
+
+issues = json.loads('''$review_output''')
+
+# Separate new-file vs modified-file issues
+new_files = set('''$new_files'''.strip().split('\n')) if '''$new_files'''.strip() else set()
+
+introduced = []
+for issue in issues:
+    f = issue['file']
+    tag = '[NEW FILE]' if f in new_files else '[CHANGED]'
+    introduced.append((issue, tag))
+
+# Sort by severity (critical first)
+sev_order = {'critical': 0, 'warning': 1, 'info': 2}
+introduced.sort(key=lambda x: sev_order.get(x[0].get('severity', 'info'), 3))
+
+critical_count = sum(1 for i, _ in introduced if i.get('severity') == 'critical')
+warning_count = sum(1 for i, _ in introduced if i.get('severity') == 'warning')
+info_count = sum(1 for i, _ in introduced if i.get('severity') == 'info')
+
+print('### Branch-Introduced Issues')
+print('')
+for issue, tag in introduced:
+    sev = issue.get('severity', 'warning').upper()
+    priority = 'Critical' if sev == 'CRITICAL' else 'Warning' if sev == 'WARNING' else 'Info'
+    detector = issue.get('detector', '?')
+    print(f'- **{priority}** | {tag}')
+    print(f'  **{issue[\"file\"]}:{issue.get(\"line\", 0)}** — {issue[\"summary\"]}')
+    print(f'  Rule: {issue.get(\"agents_md_ref\", detector)}')
+    print('')
+
+print('### Branch Health Delta')
+print('')
+print(f'  New files: $new_count (issues: {sum(1 for _, t in introduced if t == \"[NEW FILE]\")})')
+print(f'  Modified files: $mod_count (branch-introduced: {sum(1 for _, t in introduced if t == \"[CHANGED]\")})')
+print(f'  Critical: {critical_count}, Warning: {warning_count}, Info: {info_count}')
+total = len(introduced)
+verdict = 'WORSE' if critical_count > 0 else 'NEUTRAL' if warning_count > 0 else 'BETTER'
+print(f'  Net: {verdict} ({total} total issues)')
+" 2>/dev/null
+
+    total=$(echo "$review_output" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "?")
+    log_run "lint-review" "$total" "base:$base"
     ;;
   # Commands that accept --path
   scan|tree|viz|detect|move|exclude)

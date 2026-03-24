@@ -132,11 +132,22 @@ Branch Health Delta
 
 ## Stage 3: Code Review (only with `--review`)
 
-```
-Run the code-reviewer agent against `git diff main...HEAD`
+**Primary**: Run the code-reviewer agent against `git diff main...HEAD`
 Focus on: bugs, AGENTS.md violations, type safety, design system, test quality, simplification
 Agent MUST classify findings as INTRODUCED vs PRE-EXISTING (see code-reviewer agent spec)
+
+**Fallback** (when code_review hits rate limit): Run `comfy-health lint-review` instead.
+This executes all 6 Vue detectors deterministically against the diff — same convention checks,
+zero LLM dependency, instant results. Report the output as "Deterministic Review (convention checks only)".
+
+```bash
+# If code_review tool fails with rate limit:
+comfy-health lint-review --base=main
 ```
+
+Note: The deterministic fallback covers convention violations (as any, dark:, !important, cn(),
+PrimeVue, layer violations, Reka patterns, composition API) but NOT subjective judgment
+(bugs, simplification opportunities, test quality). Mention this gap in the output.
 
 ## Stage 4: Build Impact (only with `--full`)
 
