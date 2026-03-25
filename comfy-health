@@ -8,10 +8,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_PATH="${COMFY_FRONTEND_PATH:-.}"
 LOG_FILE="${COMFY_HEALTH_LOG:-$SCRIPT_DIR/.comfy-health.log}"
 
-# ── Score logging (temporary: track how scores change as we use the tool) ──
-# Appends a TSV line: timestamp, branch, commit, subcommand, issue_count, notes
-# Inspired by Karpathy's autoresearch ratchet pattern.
-# Review .comfy-health.log periodically to see if the tool is helping.
+# Source shared libraries
+source "$SCRIPT_DIR/lib/helpers.sh"
+source "$SCRIPT_DIR/lib/commands.sh"
+
+# ── Score logging ──
 log_run() {
   local subcmd="$1" issues="${2:-}" notes="${3:-}"
   local ts branch commit
@@ -39,6 +40,18 @@ Usage:
   comfy-health branch [BASE]          Scan files changed vs BASE branch (default: main)
   comfy-health doctor                 Self-check: verify deps, config, project setup
   comfy-health lint-review [--base=B] Deterministic code review (fallback for rate-limited code_review)
+  comfy-health --cleanup              Remove generated artifacts (.desloppify/, scorecard.png, etc.)
+
+Scope options (diff/branch/lint-review):
+  --since=2d                          Scope to commits in last N days/weeks (e.g. 2d, 1w)
+  --commits=N                         Scope to last N commits on current branch
+  --upstream                          Fetch and compare against upstream/main (or origin/main)
+  --list-files                        Just print changed file manifest and exit
+  --copy-to=PATH                      Copy changed files to target repo (with verify)
+  --strict                            Exit non-zero if issues found
+
+Options (scan/show):
+  --branch [BASE]                     Scope to branch-changed files only (default base: main)
 
 Options (scan):
   --skip-slow                         Skip slow detectors (duplicates)
@@ -48,6 +61,7 @@ Options (scan):
 Options (check):
   --prepare                           Generate review packet for subjective dimensions
   --import FILE                       Import completed review
+  --branch [BASE]                     Scope review to branch changes only
 
 Pass-through:
   Any unrecognized subcommand or flag is forwarded directly to desloppify.
@@ -59,22 +73,29 @@ Examples:
   comfy-health scan                   Full repo scan
   comfy-health scan --skip-slow       Skip duplicate detection
   comfy-health check                  Assess subjective quality dimensions
+  comfy-health check --branch         Scope review to branch changes vs main
   comfy-health show styling           Show all styling issues
   comfy-health show src/stores/       Show issues in a directory
   comfy-health diff                   Issues in files changed since HEAD~1
   comfy-health diff HEAD~5            Issues in files changed in last 5 commits
   comfy-health branch                 Issues in files changed vs main
   comfy-health branch develop         Issues in files changed vs develop
+  comfy-health branch --since=2d      Issues from last 2 days of commits
+  comfy-health branch --commits=10    Issues from last 10 commits
+  comfy-health branch --upstream      Compare against upstream/main
+  comfy-health branch --list-files     List files to copy for PR
+  comfy-health branch --copy-to=/path Copy changed files to PR repo (verified)
+  comfy-health scan --branch          Scan only branch-changed files
+  comfy-health show --branch styling  Show branch issues matching pattern
   comfy-health next                   Get next priority fix
   comfy-health status                 Full dashboard
   comfy-health doctor                 Check deps and project setup
+  comfy-health --cleanup              Remove all generated artifacts
   comfy-health --version              Show version
 EOF
 }
 
-# Resolve the subcommand
 cmd="${1:-}"
-
 case "$cmd" in
   -h|--help|help|"")
     usage
@@ -85,195 +106,44 @@ case "$cmd" in
     echo "comfy-health $ver"
     exit 0
     ;;
+  --cleanup|cleanup)
+    proj=$(cd "$PROJECT_PATH" 2>/dev/null && pwd)
+    removed=0
+    for target in \
+      "$proj/.desloppify" \
+      "$proj/scorecard.png" \
+      "$proj/.claude/skills/desloppify" \
+      "$proj/query.json" \
+    ; do
+      if [[ -e "$target" ]]; then
+        rm -rf "$target"
+        echo "Removed: $target"
+        removed=$((removed + 1))
+      fi
+    done
+    if [[ $removed -eq 0 ]]; then
+      echo "Nothing to clean up."
+    else
+      echo "Cleaned up $removed artifact(s)."
+    fi
+    exit 0
+    ;;
   check)
     shift
-    # "check" maps to "review --prepare" by default
-    # If user passes --import, forward as-is
-    # If user already passed --import or --prepare, forward as-is; else default to --prepare
-    has_explicit=false
-    for arg in "$@"; do
-      [[ "$arg" == "--import" || "$arg" == "--prepare" ]] && has_explicit=true
-    done
-    if $has_explicit; then
-      exec python3 -m desloppify review --path "$PROJECT_PATH" "$@"
-    else
-      exec python3 -m desloppify review --prepare --path "$PROJECT_PATH" "$@"
-    fi
+    cmd_check "$@"
     ;;
-  # Diff: show known issues for files changed since a ref (default HEAD~1)
-  # Separates new files (all issues are yours) from modified files (may be pre-existing)
   diff)
     shift
-    strict=false
-    ref="HEAD~1"
-    for arg in "$@"; do
-      if [[ "$arg" == "--strict" ]]; then
-        strict=true
-      elif [[ "$arg" != -* && "$ref" == "HEAD~1" ]]; then
-        ref="$arg"
-      fi
-    done
-    files=$(cd "$PROJECT_PATH" && git diff --name-only "$ref" -- '*.vue' '*.ts' 2>/dev/null)
-    if [[ -z "$files" ]]; then
-      echo "No changed files since $ref"
-      exit 0
-    fi
-
-    # Classify files as new (added) or modified
-    new_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=A "$ref" -- '*.vue' '*.ts' 2>/dev/null)
-    mod_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=M "$ref" -- '*.vue' '*.ts' 2>/dev/null)
-
-    new_output=""
-    mod_output=""
-    new_count=0
-    mod_count=0
-
-    # New files: all issues are branch-introduced
-    if [[ -n "$new_files" ]]; then
-      echo "── New files (all issues are yours) ──"
-      while IFS= read -r f; do
-        echo "  $f"
-        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
-        if [[ -n "$result" ]]; then
-          new_output+="$result"$'\n'
-          new_count=$((new_count + $(echo "$result" | grep -c -v '^$' || true)))
-          echo "$result"
-        fi
-      done <<< "$new_files"
-      echo ""
-    fi
-
-    # Modified files: get changed line numbers, filter issues
-    if [[ -n "$mod_files" ]]; then
-      echo "── Modified files (showing issues on changed lines only) ──"
-      while IFS= read -r f; do
-        # Extract changed line numbers from diff hunks (+side = new lines)
-        changed_lines=$(cd "$PROJECT_PATH" && git diff -U0 "$ref" -- "$f" 2>/dev/null | \
-          perl -ne 'print "$1\n" if /^@@.*\+(\d+(?:,\d+)?)/' | \
-          while IFS=, read -r start count; do
-            count=${count:-1}
-            for ((i=start; i<start+count; i++)); do echo "$i"; done
-          done)
-        echo "  $f ($(echo "$changed_lines" | wc -l | tr -d ' ') lines changed)"
-        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
-        if [[ -n "$result" && -n "$changed_lines" ]]; then
-          # Filter: only show lines that match changed line numbers
-          filtered=""
-          while IFS= read -r line; do
-            # Try to extract line number from issue output (common format: :NNN or line NNN)
-            line_num=$(echo "$line" | perl -ne 'print "$1\n" if /(?::|line\s+)(\d+)/' | head -1)
-            if [[ -z "$line_num" ]]; then
-              # No line number found — include it (header/summary line)
-              filtered+="$line"$'\n'
-            elif echo "$changed_lines" | grep -qx "$line_num"; then
-              filtered+="$line"$'\n'
-            fi
-          done <<< "$result"
-          if [[ -n "$filtered" ]]; then
-            mod_output+="$filtered"
-            mod_count=$((mod_count + $(echo "$filtered" | grep -c -v '^$' || true)))
-            echo "$filtered"
-          fi
-        fi
-      done <<< "$mod_files"
-      echo ""
-    fi
-
-    total=$((new_count + mod_count))
-    echo "Summary: $new_count issues in new files, $mod_count issues on changed lines in modified files ($total total)"
-    log_run "diff" "$total" "ref:$ref new:$new_count mod:$mod_count"
-    if $strict && [[ $total -gt 0 ]]; then
-      exit 1
-    fi
+    cmd_diff "$@"
     ;;
-  # Branch: show known issues for files changed vs a base branch (default main)
-  # Separates new files from modified files to avoid blaming pre-existing debt on the branch
   branch)
     shift
-    strict=false
-    base="main"
-    for arg in "$@"; do
-      if [[ "$arg" == "--strict" ]]; then
-        strict=true
-      elif [[ "$arg" != -* && "$base" == "main" ]]; then
-        base="$arg"
-      fi
-    done
-    merge_base=$(cd "$PROJECT_PATH" && git merge-base "$base" HEAD 2>/dev/null || echo "$base")
-    files=$(cd "$PROJECT_PATH" && git diff --name-only "$merge_base" -- '*.vue' '*.ts' 2>/dev/null)
-    if [[ -z "$files" ]]; then
-      echo "No changed files vs $base"
-      exit 0
-    fi
-    echo "Branch: $(cd "$PROJECT_PATH" && git symbolic-ref --short HEAD 2>/dev/null) vs $base (merge-base: ${merge_base:0:8})"
-    echo ""
-
-    # Classify files as new (added) or modified
-    new_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=A "$merge_base" -- '*.vue' '*.ts' 2>/dev/null)
-    mod_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=M "$merge_base" -- '*.vue' '*.ts' 2>/dev/null)
-
-    new_output=""
-    mod_output=""
-    new_count=0
-    mod_count=0
-
-    # New files: all issues are branch-introduced
-    if [[ -n "$new_files" ]]; then
-      echo "── New files ($(echo "$new_files" | wc -l | tr -d ' ') files — all issues are branch-introduced) ──"
-      while IFS= read -r f; do
-        echo "  $f"
-        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
-        if [[ -n "$result" ]]; then
-          new_output+="$result"$'\n'
-          new_count=$((new_count + $(echo "$result" | grep -c -v '^$' || true)))
-          echo "$result"
-        fi
-      done <<< "$new_files"
-      echo ""
-    fi
-
-    # Modified files: only show issues on changed lines
-    if [[ -n "$mod_files" ]]; then
-      echo "── Modified files ($(echo "$mod_files" | wc -l | tr -d ' ') files — showing changed-line issues only) ──"
-      while IFS= read -r f; do
-        changed_lines=$(cd "$PROJECT_PATH" && git diff -U0 "$merge_base" -- "$f" 2>/dev/null | \
-          perl -ne 'print "$1\n" if /^@@.*\+(\d+(?:,\d+)?)/' | \
-          while IFS=, read -r start count; do
-            count=${count:-1}
-            for ((i=start; i<start+count; i++)); do echo "$i"; done
-          done)
-        echo "  $f ($(echo "$changed_lines" | wc -l | tr -d ' ') lines changed)"
-        result=$(python3 -m desloppify show "$f" --no-budget 2>/dev/null || true)
-        if [[ -n "$result" && -n "$changed_lines" ]]; then
-          filtered=""
-          while IFS= read -r line; do
-            line_num=$(echo "$line" | perl -ne 'print "$1\n" if /(?::|line\s+)(\d+)/' | head -1)
-            if [[ -z "$line_num" ]]; then
-              filtered+="$line"$'\n'
-            elif echo "$changed_lines" | grep -qx "$line_num"; then
-              filtered+="$line"$'\n'
-            fi
-          done <<< "$result"
-          if [[ -n "$filtered" ]]; then
-            mod_output+="$filtered"
-            mod_count=$((mod_count + $(echo "$filtered" | grep -c -v '^$' || true)))
-            echo "$filtered"
-          fi
-        fi
-      done <<< "$mod_files"
-      echo ""
-    fi
-
-    total=$((new_count + mod_count))
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Branch-introduced issues: $total ($new_count in new files, $mod_count on changed lines)"
-    echo "Files: $(echo "$new_files" | grep -c -v '^$' || true) new, $(echo "$mod_files" | grep -c -v '^$' || true) modified"
-    log_run "branch" "$total" "base:$base new:$new_count mod:$mod_count"
-    if $strict && [[ $total -gt 0 ]]; then
-      exit 1
-    fi
+    cmd_branch "$@"
     ;;
-  # Self-check: verify deps, config, project setup
+  lint-review)
+    shift
+    cmd_lint_review "$@"
+    ;;
   doctor)
     errors=0
 
@@ -344,151 +214,57 @@ case "$cmd" in
 
     exit $errors
     ;;
-  # Deterministic code review — runs all 6 Vue detectors against diff, formatted
-  # like the code-reviewer agent. Zero LLM dependency, no rate limits.
-  # Use as fallback when code_review tool hits rate limits.
-  lint-review)
+  # Scan with optional --branch scoping
+  scan)
     shift
-    base="main"
-    ref=""
+    has_branch=false
+    branch_base="main"
+    scan_args=()
     for arg in "$@"; do
-      if [[ "$arg" == --base=* ]]; then
-        base="${arg#--base=}"
-      elif [[ "$arg" != -* ]]; then
-        ref="$arg"
-      fi
+      case "$arg" in
+        --branch) has_branch=true ;;
+        --branch=*) has_branch=true; branch_base="${arg#--branch=}" ;;
+        *) scan_args+=("$arg") ;;
+      esac
     done
 
-    # Determine file scope
-    if [[ -n "$ref" ]]; then
-      merge_base="$ref"
-    else
-      merge_base=$(cd "$PROJECT_PATH" && git merge-base "$base" HEAD 2>/dev/null || echo "$base")
-    fi
-
-    new_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=A "$merge_base" -- '*.vue' '*.ts' 2>/dev/null || true)
-    mod_files=$(cd "$PROJECT_PATH" && git diff --name-only --diff-filter=M "$merge_base" -- '*.vue' '*.ts' 2>/dev/null || true)
-
-    if [[ -z "$new_files" ]]; then new_count=0; else new_count=$(echo "$new_files" | grep -c -v '^$' || echo 0); fi
-    if [[ -z "$mod_files" ]]; then mod_count=0; else mod_count=$(echo "$mod_files" | grep -c -v '^$' || echo 0); fi
-
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "Deterministic Code Review (lint-review)"
-    echo "Scope: ${new_count} new files, ${mod_count} modified files vs ${base}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-
-    # Create temp directory with only changed files for targeted scanning
-    tmpdir=$(mktemp -d)
-    trap "rm -rf $tmpdir" EXIT
-
-    all_files=$(echo -e "${new_files}\n${mod_files}" | grep -v '^$' | sort -u)
-
-    if [[ -z "$all_files" ]]; then
-      echo "No changed .vue/.ts files — nothing to review."
-      log_run "lint-review" "0" "base:$base no_changes"
-      exit 0
-    fi
-
-    # Copy changed files into temp dir preserving structure
-    while IFS= read -r f; do
-      if [[ -f "$PROJECT_PATH/$f" ]]; then
-        mkdir -p "$tmpdir/$(dirname "$f")"
-        cp "$PROJECT_PATH/$f" "$tmpdir/$f"
+    if $has_branch; then
+      # Scoped scan: only branch-changed files
+      parse_scope_flags "$branch_base" "${scan_args[@]}"
+      resolve_scope_ref "$_BASE"
+      ref="$_RESOLVED_REF"
+      get_changed_files "$ref"
+      all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+      if [[ -z "$all_files" ]]; then
+        echo "No changed .vue/.ts files vs $_BASE — nothing to scan."
+        exit 0
       fi
-    done <<< "$all_files"
-
-    # Run all 6 detectors against temp dir (cd into it so paths are relative)
-    review_output=$(cd "$tmpdir" && python3 -c "
-import sys, json
-from pathlib import Path
-
-sys.path.insert(0, '$SCRIPT_DIR/desloppify-fork')
-from desloppify.languages.typescript.detectors.vue import (
-    detect_composition_api,
-    detect_component_violations,
-    detect_styling_violations,
-    detect_layer_violations,
-    detect_conventions,
-    detect_reka_patterns,
-)
-
-path = Path('.')
-all_issues = []
-for detect_fn in [
-    detect_composition_api,
-    detect_component_violations,
-    detect_styling_violations,
-    detect_layer_violations,
-    detect_conventions,
-    detect_reka_patterns,
-]:
-    issues, _ = detect_fn(path)
-    all_issues.extend(issues)
-
-print(json.dumps(all_issues))
-" 2>/dev/null)
-
-    if [[ -z "$review_output" || "$review_output" == "[]" ]]; then
-      echo "✓ All clean — no convention violations in changed files."
-      echo ""
-      echo "### Branch Health Delta"
-      echo "  New files: $new_count (issues: 0)"
-      echo "  Modified files: $mod_count (branch-introduced: 0)"
-      echo "  Net: CLEAN"
-      log_run "lint-review" "0" "base:$base clean"
-      exit 0
+      tmpdir=$(mktemp -d)
+      trap "rm -rf $tmpdir" EXIT
+      while IFS= read -r f; do
+        if [[ -n "$f" && -f "$PROJECT_PATH/$f" ]]; then
+          mkdir -p "$tmpdir/$(dirname "$f")"
+          cp "$PROJECT_PATH/$f" "$tmpdir/$f"
+        fi
+      done <<< "$all_files"
+      new_count=$(count_lines "$_NEW_FILES")
+      mod_count=$(count_lines "$_MOD_FILES")
+      echo "Branch-scoped scan: $new_count new, $mod_count modified files vs $_BASE"
+      log_run "scan" "" "started branch:$_BASE"
+      python3 -m desloppify scan --path "$tmpdir" "${scan_args[@]}"
+      rc=$?
+      log_run "scan" "" "exit:$rc branch:$_BASE"
+      exit $rc
+    else
+      log_run "$cmd" "" "started"
+      python3 -m desloppify scan --path "$PROJECT_PATH" "${scan_args[@]}"
+      rc=$?
+      log_run "$cmd" "" "exit:$rc"
+      exit $rc
     fi
-
-    # Parse and format like code-reviewer agent output
-    python3 -c "
-import json, sys
-
-issues = json.loads('''$review_output''')
-
-# Separate new-file vs modified-file issues
-new_files = set('''$new_files'''.strip().split('\n')) if '''$new_files'''.strip() else set()
-
-introduced = []
-for issue in issues:
-    f = issue['file']
-    tag = '[NEW FILE]' if f in new_files else '[CHANGED]'
-    introduced.append((issue, tag))
-
-# Sort by severity (critical first)
-sev_order = {'critical': 0, 'warning': 1, 'info': 2}
-introduced.sort(key=lambda x: sev_order.get(x[0].get('severity', 'info'), 3))
-
-critical_count = sum(1 for i, _ in introduced if i.get('severity') == 'critical')
-warning_count = sum(1 for i, _ in introduced if i.get('severity') == 'warning')
-info_count = sum(1 for i, _ in introduced if i.get('severity') == 'info')
-
-print('### Branch-Introduced Issues')
-print('')
-for issue, tag in introduced:
-    sev = issue.get('severity', 'warning').upper()
-    priority = 'Critical' if sev == 'CRITICAL' else 'Warning' if sev == 'WARNING' else 'Info'
-    detector = issue.get('detector', '?')
-    print(f'- **{priority}** | {tag}')
-    print(f'  **{issue[\"file\"]}:{issue.get(\"line\", 0)}** — {issue[\"summary\"]}')
-    print(f'  Rule: {issue.get(\"agents_md_ref\", detector)}')
-    print('')
-
-print('### Branch Health Delta')
-print('')
-print(f'  New files: $new_count (issues: {sum(1 for _, t in introduced if t == \"[NEW FILE]\")})')
-print(f'  Modified files: $mod_count (branch-introduced: {sum(1 for _, t in introduced if t == \"[CHANGED]\")})')
-print(f'  Critical: {critical_count}, Warning: {warning_count}, Info: {info_count}')
-total = len(introduced)
-verdict = 'WORSE' if critical_count > 0 else 'NEUTRAL' if warning_count > 0 else 'BETTER'
-print(f'  Net: {verdict} ({total} total issues)')
-" 2>/dev/null
-
-    total=$(echo "$review_output" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "?")
-    log_run "lint-review" "$total" "base:$base"
     ;;
-  # Commands that accept --path
-  scan|tree|viz|detect|move|exclude)
+  # Other commands that accept --path
+  tree|viz|detect|move|exclude)
     shift
     log_run "$cmd" "" "started"
     python3 -m desloppify "$cmd" --path "$PROJECT_PATH" "$@"
@@ -496,8 +272,47 @@ print(f'  Net: {verdict} ({total} total issues)')
     log_run "$cmd" "" "exit:$rc"
     exit $rc
     ;;
+  # Show with optional --branch scoping
+  show)
+    shift
+    has_branch=false
+    branch_base="main"
+    show_args=()
+    for arg in "$@"; do
+      case "$arg" in
+        --branch) has_branch=true ;;
+        --branch=*) has_branch=true; branch_base="${arg#--branch=}" ;;
+        *) show_args+=("$arg") ;;
+      esac
+    done
+
+    if $has_branch; then
+      # Filter show output to only branch-changed files
+      parse_scope_flags "$branch_base"
+      resolve_scope_ref "$_BASE"
+      ref="$_RESOLVED_REF"
+      changed=$(cd "$PROJECT_PATH" && git diff --name-only "$ref" -- '*.vue' '*.ts' 2>/dev/null || true)
+      if [[ -z "$changed" ]]; then
+        echo "No changed files vs $_BASE"
+        exit 0
+      fi
+      # Run show and filter output to only lines mentioning changed files
+      full_output=$(python3 -m desloppify show "${show_args[@]}" 2>/dev/null || true)
+      if [[ -z "$full_output" ]]; then
+        echo "No issues found."
+        exit 0
+      fi
+      echo "Showing issues for branch-changed files only (vs $_BASE):"
+      echo ""
+      while IFS= read -r cf; do
+        echo "$full_output" | grep -F -i "$cf" || true
+      done <<< "$changed"
+    else
+      exec python3 -m desloppify show "${show_args[@]}"
+    fi
+    ;;
   # Commands that use --state (no --path flag)
-  status|next|backlog|plan|show|autofix|suppress|review|zone)
+  status|next|backlog|plan|autofix|suppress|review|zone)
     shift
     exec python3 -m desloppify "$cmd" "$@"
     ;;
