@@ -30,7 +30,7 @@ if $has_branch; then
   ref="$_RESOLVED_REF"
 
   get_changed_files "$ref"
-  all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+  all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u || true)
 
   if [[ -z "$all_files" ]]; then
     echo "No changed .vue/.ts files vs $_BASE — nothing to review."
@@ -112,7 +112,7 @@ fi
 ref="$_RESOLVED_REF"
 
 get_changed_files "$ref"
-all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u || true)
 if [[ -z "$all_files" ]]; then
   echo "No changed .vue/.ts files since $ref"
   exit 0
@@ -165,7 +165,7 @@ resolve_scope_ref "$effective_base"
 ref="$_RESOLVED_REF"
 
 get_changed_files "$ref"
-all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u || true)
 if [[ -z "$all_files" ]]; then
   echo "No changed .vue/.ts files vs $_BASE"
   exit 0
@@ -185,12 +185,12 @@ if [[ -n "$_CROSS_DATE_ONLY" ]]; then
     if cd "$PROJECT_PATH" && git cat-file -e "${ref}:${f}" 2>/dev/null; then echo "$f"; fi
   done)
   if [[ -n "$date_extra_new" ]]; then
-    _NEW_FILES=$(echo -e "${_NEW_FILES}\n${date_extra_new}" | grep -v '^$' | sort -u)
+    _NEW_FILES=$(echo -e "${_NEW_FILES}\n${date_extra_new}" | grep -v '^$' | sort -u || true)
   fi
   if [[ -n "$date_extra_mod" ]]; then
-    _MOD_FILES=$(echo -e "${_MOD_FILES}\n${date_extra_mod}" | grep -v '^$' | sort -u)
+    _MOD_FILES=$(echo -e "${_MOD_FILES}\n${date_extra_mod}" | grep -v '^$' | sort -u || true)
   fi
-  all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+  all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u || true)
 fi
 
 # Also get deleted files (need to know what to remove from PR repo)
@@ -319,7 +319,7 @@ resolve_scope_ref "$_BASE"
 ref="$_RESOLVED_REF"
 
 get_changed_files "$ref"
-all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u || true)
 
 new_count=$(count_lines "$_NEW_FILES")
 mod_count=$(count_lines "$_MOD_FILES")

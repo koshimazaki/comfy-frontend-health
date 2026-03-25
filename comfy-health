@@ -234,7 +234,7 @@ case "$cmd" in
       resolve_scope_ref "$_BASE"
       ref="$_RESOLVED_REF"
       get_changed_files "$ref"
-      all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u)
+      all_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | sort -u || true)
       if [[ -z "$all_files" ]]; then
         echo "No changed .vue/.ts files vs $_BASE — nothing to scan."
         exit 0
