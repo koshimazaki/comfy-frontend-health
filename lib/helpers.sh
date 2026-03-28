@@ -50,7 +50,7 @@ run_detectors_on_files() {
 
   # Run all 6 detectors (pass SCRIPT_DIR via env var to avoid injection)
   local result
-  result=$(cd "$tmpdir" && _DESLOP_ROOT="$SCRIPT_DIR/desloppify-fork" python3 -c "
+  result=$(cd "$tmpdir" && _DESLOP_ROOT="$SCRIPT_DIR/desloppify-fork" _PROJECT_ROOT="$PROJECT_PATH" python3 -c "
 import sys, json, os
 from pathlib import Path
 
@@ -78,7 +78,7 @@ for detect_fn in [
     all_issues.extend(issues)
 
 print(json.dumps(all_issues))
-" 2>&1 || echo "[]")
+" 2>/dev/null || echo "[]")
 
   rm -rf "$tmpdir"
   echo "$result"
@@ -89,19 +89,30 @@ print(json.dumps(all_issues))
 # Outputs: JSON object { "file": [line, line, ...], ... } on stdout
 build_changed_lines_json() {
   local mod_files="$1" ref="$2"
-  local result="{"
-  local first=true
+  local entries=()
   if [[ -n "$mod_files" ]]; then
     while IFS= read -r f; do
       [[ -z "$f" ]] && continue
       local lines
       lines=$(extract_changed_lines "$ref" "$f" | paste -sd',' -)
-      if $first; then first=false; else result+=","; fi
-      result+="\"$f\":[$lines]"
+      entries+=("$f"$'\t'"$lines")
     done <<< "$mod_files"
   fi
-  result+="}"
-  echo "$result"
+  # Use Python to safely build JSON (handles special chars in filenames)
+  printf '%s\n' "${entries[@]+"${entries[@]}"}" | python3 -c "
+import sys, json
+result = {}
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    parts = line.split('\t', 1)
+    fname = parts[0]
+    lines_str = parts[1] if len(parts) > 1 else ''
+    lines_list = [int(x) for x in lines_str.split(',') if x.strip()]
+    result[fname] = lines_list
+print(json.dumps(result))
+" 2>/dev/null
 }
 
 # Classify issues as NEW FILE or CHANGED LINE, filter modified-file issues
@@ -237,7 +248,7 @@ print(f'  Verdict: {verdict}')
 print(f'  Branch-Scoped Score: {overall}/100')
 
 print(f'__TOTAL__:{total}')
-" 2>&1
+" 2>/dev/null
 }
 
 # Resolve scope ref from flexible flags: --since=2d, --commits=N, explicit ref, or merge-base
@@ -303,7 +314,7 @@ cross_check_scope() {
   local date_files=""
   if [[ -n "$branch_start_date" ]]; then
     # Files touched by commits since branch started
-    date_files=$(cd "$PROJECT_PATH" && git log --since="$branch_start_date" --name-only --format="" HEAD -- '*.vue' '*.ts' 2>/dev/null | sort -u | grep -v '^$')
+    date_files=$(cd "$PROJECT_PATH" && git log --since="$branch_start_date" --name-only --format="" HEAD -- '*.vue' '*.ts' 2>/dev/null | sort -u | grep -v '^$' || true)
   fi
 
   # Compare

@@ -133,10 +133,10 @@ if python3 -m desloppify --version &>/dev/null; then
     fail "doctor: wrapper handled gracefully" "exit code $rc"
   fi
 
-  if echo "$out" | grep -qiE "(check|doctor|error|usage)"; then
+  if echo "$out" | grep -qiE "(check|doctor|error|usage|python|desloppify|project|git)"; then
     pass "doctor: produced recognizable output"
   else
-    pass "doctor: ran without crash (output may vary)"
+    fail "doctor: produced recognizable output" "unexpected output: $out"
   fi
 else
   echo "  ⊘ skipped (desloppify not installed)"

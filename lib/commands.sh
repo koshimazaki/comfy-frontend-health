@@ -178,7 +178,7 @@ cross_check_scope "$ref" "$_BASE"
 if [[ -n "$_CROSS_DATE_ONLY" ]]; then
   date_extra_new=$(cd "$PROJECT_PATH" && echo "$_CROSS_DATE_ONLY" | while IFS= read -r f; do
     [[ -z "$f" ]] && continue
-    if ! cd "$PROJECT_PATH" && git cat-file -e "${ref}:${f}" 2>/dev/null; then echo "$f"; fi
+    if ! (cd "$PROJECT_PATH" && git cat-file -e "${ref}:${f}" 2>/dev/null); then echo "$f"; fi
   done)
   date_extra_mod=$(cd "$PROJECT_PATH" && echo "$_CROSS_DATE_ONLY" | while IFS= read -r f; do
     [[ -z "$f" ]] && continue
@@ -276,8 +276,8 @@ stat_line=$(cd "$PROJECT_PATH" && git diff --shortstat "$ref" -- '*.vue' '*.ts' 
 total_files=$(echo -e "${_NEW_FILES}\n${_MOD_FILES}" | grep -v '^$' | wc -l | tr -d ' ')
 
 # Count test files in branch
-test_new=$(echo "$_NEW_FILES" | grep -c '\.test\.\|\.spec\.\|__tests__' || echo 0)
-test_mod=$(echo "$_MOD_FILES" | grep -c '\.test\.\|\.spec\.\|__tests__' || echo 0)
+test_new=$(echo "$_NEW_FILES" | { grep -c '\.test\.\|\.spec\.\|__tests__' || true; })
+test_mod=$(echo "$_MOD_FILES" | { grep -c '\.test\.\|\.spec\.\|__tests__' || true; })
 src_new=$((new_count - test_new))
 del_files=$(count_lines "$del_list")
 

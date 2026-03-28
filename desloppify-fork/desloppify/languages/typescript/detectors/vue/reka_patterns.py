@@ -11,6 +11,7 @@ Finds:
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -189,7 +190,12 @@ def detect_reka_patterns(path: Path) -> tuple[list[dict], int]:
         # ── Missing Storybook story for ui/ component ─────────────────
         if "/components/ui/" in filepath and filepath.endswith(".vue"):
             story_path = filepath.replace(".vue", ".stories.ts")
-            if not Path(story_path).exists():
+            # Check against real project root when running in branch-scoped temp dir
+            project_root = os.environ.get("_PROJECT_ROOT", "")
+            story_exists = Path(story_path).exists()
+            if not story_exists and project_root:
+                story_exists = Path(project_root, story_path.lstrip("./")).exists()
+            if not story_exists:
                 issues.append(
                     {
                         "file": filepath,
