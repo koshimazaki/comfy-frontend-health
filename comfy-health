@@ -230,7 +230,7 @@ case "$cmd" in
 
     if $has_branch; then
       # Scoped scan: only branch-changed files
-      parse_scope_flags "$branch_base" "${scan_args[@]}"
+      parse_scope_flags "$branch_base" "${scan_args[@]+"${scan_args[@]}"}"
       resolve_scope_ref "$_BASE"
       ref="$_RESOLVED_REF"
       get_changed_files "$ref"
@@ -251,13 +251,13 @@ case "$cmd" in
       mod_count=$(count_lines "$_MOD_FILES")
       echo "Branch-scoped scan: $new_count new, $mod_count modified files vs $_BASE"
       log_run "scan" "" "started branch:$_BASE"
-      python3 -m desloppify scan --path "$tmpdir" "${scan_args[@]}"
+      python3 -m desloppify scan --path "$tmpdir" "${scan_args[@]+"${scan_args[@]}"}"
       rc=$?
       log_run "scan" "" "exit:$rc branch:$_BASE"
       exit $rc
     else
       log_run "$cmd" "" "started"
-      python3 -m desloppify scan --path "$PROJECT_PATH" "${scan_args[@]}"
+      python3 -m desloppify scan --path "$PROJECT_PATH" "${scan_args[@]+"${scan_args[@]}"}"
       rc=$?
       log_run "$cmd" "" "exit:$rc"
       exit $rc

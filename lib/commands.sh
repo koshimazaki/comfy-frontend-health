@@ -25,7 +25,7 @@ done
 if $has_branch; then
   # Scoped review: copy only branch-changed files to temp dir,
   # pass that as --path so reviewers only see branch contributions.
-  parse_scope_flags "$branch_base" "${remaining_args[@]}"
+  parse_scope_flags "$branch_base" "${remaining_args[@]+"${remaining_args[@]}"}"
   resolve_scope_ref "$_BASE"
   ref="$_RESOLVED_REF"
 
@@ -85,18 +85,18 @@ CTXEOF
 
   # Forward to desloppify review with scoped path (no exec — let trap clean tmpdir)
   if $has_explicit; then
-    python3 -m desloppify review --path "$tmpdir" "${remaining_args[@]}"
+    python3 -m desloppify review --path "$tmpdir" "${remaining_args[@]+"${remaining_args[@]}"}"
     exit $?
   else
-    python3 -m desloppify review --prepare --path "$tmpdir" "${remaining_args[@]}"
+    python3 -m desloppify review --prepare --path "$tmpdir" "${remaining_args[@]+"${remaining_args[@]}"}"
     exit $?
   fi
 else
   # Standard full-repo review
   if $has_explicit; then
-    exec python3 -m desloppify review --path "$PROJECT_PATH" "${remaining_args[@]}"
+    exec python3 -m desloppify review --path "$PROJECT_PATH" "${remaining_args[@]+"${remaining_args[@]}"}"
   else
-    exec python3 -m desloppify review --prepare --path "$PROJECT_PATH" "${remaining_args[@]}"
+    exec python3 -m desloppify review --prepare --path "$PROJECT_PATH" "${remaining_args[@]+"${remaining_args[@]}"}"
   fi
 fi
 }
